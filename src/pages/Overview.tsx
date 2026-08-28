@@ -13,8 +13,11 @@ type Props = { go: (v: View) => void; openJob: (id: string | null) => void }
 
 export default function Overview({ go, openJob }: Props) {
   // every figure below is derived from the day ledger / JOBS — nothing hand-typed
-  const { services, queue, isLive, emptyQueue, deliveredToday } = useResolved()
-  const open = queue.filter((j) => j.status !== 'delivered')
+  const { services, queue, isLive, emptyQueue, deliveredToday, queueTotal, queueTruncated, queueLimit, status } =
+    useResolved()
+  // backlog comes from the server, never from counting rows — /api/queue is
+  // paged, so a row count is "in this page" masquerading as "in total"
+  const open = status ? status.backlog : queue.filter((j) => j.status !== 'delivered').length
   const turnaround = isLive ? null : measuredTurnaroundMins()
 
   const nav = (v: View) => (e: React.MouseEvent) => {
@@ -141,11 +144,12 @@ export default function Overview({ go, openJob }: Props) {
         <div className="shead">
           <h2>
             <i className="dot" />
-            queue<span className="n">{open.length}</span>
+            queue<span className="n">{open}</span>
           </h2>
           <span className="meta">
             {deliveredToday} delivered today
             {turnaround ? ` · ${turnaround} min median turnaround, measured` : ''}
+            {queueTruncated ? ` · showing ${queueLimit} of ${queueTotal}` : ''}
           </span>
         </div>
         {emptyQueue ? (

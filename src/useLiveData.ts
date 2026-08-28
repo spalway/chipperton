@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getQueue, getServices, getStatus, hasApi, type QueueResponse, type ServiceResponse, type StatusResponse } from './api'
+import { getQueue, getServices, getStatus, hasApi, type QueuePage, type ServiceResponse, type StatusResponse } from './api'
 import { adaptQueueRow, adaptService } from './adapt'
 import { JOBS, SERVICES } from './data'
 
@@ -20,7 +20,7 @@ export type LiveData = {
   error: string | null
   status: StatusResponse | null
   services: ServiceResponse[] | null
-  queue: QueueResponse[] | null
+  queue: QueuePage | null
   loading: boolean
 }
 
@@ -46,9 +46,18 @@ export function useResolved() {
     error: live.error,
     status: live.status,
     services: isLive && live.services ? live.services.map(adaptService) : SERVICES,
-    queue: isLive && live.queue ? live.queue.map(adaptQueueRow) : JOBS,
+    queue: isLive && live.queue ? live.queue.rows.map(adaptQueueRow) : JOBS,
+    /**
+     * Exact count across the whole queue, from X-Queue-Total. NEVER use the
+     * length of the rows above — /api/queue is paged at 25, so a row count is
+     * "in this page" wearing the label "in total".
+     */
+    queueTotal: isLive ? (live.queue?.total ?? 0) : JOBS.length,
+    /** true when there are more orders than this page shows */
+    queueTruncated: isLive ? (live.queue?.truncated ?? false) : false,
+    queueLimit: isLive ? (live.queue?.limit ?? 0) : JOBS.length,
     /** true when the API answered and genuinely has no rows */
-    emptyQueue: isLive && (live.queue?.length ?? 0) === 0,
+    emptyQueue: isLive && (live.queue?.rows.length ?? 0) === 0,
     /**
      * Delivered since UTC midnight. Server-side when live — counting delivered
      * rows in the visible queue would silently mean "delivered in this page of

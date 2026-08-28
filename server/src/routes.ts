@@ -139,6 +139,29 @@ app.get('/api/services', async (c) => {
  */
 const QUEUE_PAGE_LIMIT = 25;
 
+/** Statuses after which nothing about the order will change again. */
+const TERMINAL: ReadonlySet<string> = new Set(['delivered', 'refunded', 'expired', 'failed']);
+
+/**
+ * Fields like `receiptSig`, `reportHash` and `deliveredAt` are "empty now,
+ * filled on delivery" — EXCEPT when the order ended without ever being
+ * delivered, where they are empty forever.
+ *
+ * Sending a bare null for both cases makes every client re-derive "will this
+ * ever arrive?" from status semantics it has to know. That inference is exactly
+ * what produced a "Receipt: on delivery" label on an already-refunded job. So
+ * the server states it instead of making the client work it out.
+ */
+function lifecycle(status: string) {
+  return {
+    /** Nothing about this order will change again. */
+    terminal: TERMINAL.has(status),
+    /** A report and receipt are still expected. When false and receiptSig is
+     *  null, that null is permanent — do not render it as pending. */
+    awaitingDelivery: status === 'paid' || status === 'running',
+  };
+}
+
 app.get('/api/queue', async (c) => {
   const { data, error, count } = await db
     .from('orders')
@@ -210,6 +233,8 @@ app.get('/api/queue', async (c) => {
          *  per-service guess. The UI must not call it measured unless this
          *  says 'measured'. */
         etaBasis: measured !== null ? 'measured' : 'declared',
+
+        ...lifecycle(o.status),
 
         paymentSig: o.payment_sig,
         receiptSig: o.receipt_sig,
@@ -382,6 +407,7 @@ app.get('/api/orders/:id', async (c) => {
     input: order.input,
     payerWallet: order.payer_wallet,
     status: order.status,
+    ...lifecycle(order.status),
     currency: order.currency,
     amountSol: order.amount_lamports / LAMPORTS_PER_SOL,
     createdAt: order.created_at,

@@ -49,7 +49,14 @@ const mountWithApi = async (
     vi.fn(async (url: string) => {
       if (!ok) throw new Error('connection refused')
       const body = url.includes('/api/status') ? { ...LIVE_STATUS, ...overrides } : []
-      return { ok: true, json: async () => body } as Response
+      // /api/queue is paged; the real response carries these headers and the
+      // client reads the exact total from them rather than counting rows
+      const headers = new Headers({
+        'X-Queue-Total': '2',
+        'X-Queue-Limit': '25',
+        'X-Queue-Truncated': 'false',
+      })
+      return { ok: true, headers, json: async () => body } as Response
     }),
   )
   const { default: Status } = await import('./Status')

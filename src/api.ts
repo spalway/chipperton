@@ -116,8 +116,40 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 
 export const getStatus = (s?: AbortSignal) => get<StatusResponse>('/api/status', s)
 export const getServices = (s?: AbortSignal) => get<ServiceResponse[]>('/api/services', s)
-export const getQueue = (s?: AbortSignal) => get<QueueResponse[]>('/api/queue', s)
 export const getCosts = (s?: AbortSignal) => get<CostsResponse>('/api/costs', s)
+
+export type QueuePage = {
+  rows: QueueResponse[]
+  /** Exact count across the WHOLE queue — not `rows.length`, which is one page. */
+  total: number
+  limit: number
+  truncated: boolean
+}
+
+/**
+ * /api/queue is PAGED (limit 25). Counting `rows` gives you "in this page of
+ * results" wearing the label "in total" — correct at 2 orders and silently
+ * wrong at 26. The exact count comes from the X-Queue-Total header.
+ */
+export async function getQueue(signal?: AbortSignal): Promise<QueuePage> {
+  if (!hasApi()) throw new ApiError('VITE_API_URL is not set')
+  const res = await fetch(`${API_BASE}/api/queue`, {
+    signal,
+    headers: { accept: 'application/json' },
+  })
+  if (!res.ok) throw new ApiError(`/api/queue → ${res.status}`)
+  const rows = (await res.json()) as QueueResponse[]
+  const num = (h: string, fallback: number) => {
+    const v = Number(res.headers.get(h))
+    return Number.isFinite(v) && v > 0 ? v : fallback
+  }
+  return {
+    rows,
+    total: num('X-Queue-Total', rows.length),
+    limit: num('X-Queue-Limit', rows.length),
+    truncated: res.headers.get('X-Queue-Truncated') === 'true',
+  }
+}
 
 /**
  * Rows whose model wasn't in the rate table recorded $0. Summing them into a
