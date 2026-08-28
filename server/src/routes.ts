@@ -105,7 +105,7 @@ app.get('/api/services', async (c) => {
 app.get('/api/queue', async (c) => {
   const { data, error } = await db
     .from('orders')
-    .select('id,service_id,status,currency,amount_lamports,created_at,paid_at,delivered_at,payment_sig,receipt_sig,eta_deadline')
+    .select('id,service_id,status,currency,amount_lamports,created_at,paid_at,delivered_at,payment_sig,receipt_sig,eta_deadline,report_hash')
     .in('status', ['paid', 'running', 'delivered', 'refunded'])
     .order('created_at', { ascending: false })
     .limit(25);
@@ -157,6 +157,14 @@ app.get('/api/queue', async (c) => {
 
         paymentSig: o.payment_sig,
         receiptSig: o.receipt_sig,
+
+        /** PUBLIC on purpose. This hash is already broadcast on-chain inside
+         *  the receipt memo (chp:1:done:<id>:<hash>), so gating it here would
+         *  protect nothing while implying it was protected. It is also the
+         *  entire verifiability story: hold the report, hash it, compare.
+         *  It does not leak the queried address — the hash covers the full
+         *  report including non-deterministic model prose. */
+        reportHash: o.report_hash,
       };
     }),
   );
