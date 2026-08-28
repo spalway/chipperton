@@ -77,7 +77,10 @@ async function writeVerdict(
 ): Promise<string> {
   const res = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 900,
+    // Was 900, which the first real delivery hit exactly — the verdict stopped
+    // mid-word and the receipt committed to the truncated text. Headroom now,
+    // plus the stop_reason check below so a truncation can never ship again.
+    max_tokens: 2500,
     // Short, bounded judgement over facts already gathered. Low effort is the
     // cost lever here — the alternative (a cheaper model) is the operator's
     // call, via CHIPPERTON_MODEL, not a default we make quietly.
@@ -94,7 +97,19 @@ async function writeVerdict(
     messages: [{ role: 'user', content: factsBlock }],
   });
 
+  // Cost is recorded before the truncation check — the tokens were spent and
+  // billed whether or not we can use the result.
   await recordInferenceCost(res.usage, orderId);
+
+  // A report that stops mid-sentence is broken work. Delivering it would also
+  // commit the receipt hash to a truncated body, making the defect permanent
+  // and provable. Fail instead — the worker turns a failed job into a refund.
+  if (res.stop_reason === 'max_tokens') {
+    throw new Error(
+      `verdict truncated at max_tokens (${res.usage.output_tokens} tokens) — ` +
+        'refusing to deliver a partial report',
+    );
+  }
 
   return res.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
