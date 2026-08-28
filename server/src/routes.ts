@@ -143,6 +143,21 @@ app.get('/api/status', async (c) => {
     /** 'measured' | 'declared' — which figure runwayDays actually used.
      *  The UI must not call runway "measured" unless this says so. */
     dailyCostBasis: basis,
+    /**
+     * Why the basis is what it is, and what would change it.
+     *
+     * This field flips on its own roughly 24h after the first jobs run, and
+     * when it does it silently changes what every cost and runway label is
+     * asserting. Nobody is watching at that moment. Stating the threshold and
+     * the current distance from it means a consumer can see the flip coming
+     * and test both branches, rather than discovering it from a number.
+     */
+    dailyCostBasisReason:
+      basis === 'measured'
+        ? `observed from ${spend.sampleCount} ledger entries over ` +
+          `${spend.hoursObserved.toFixed(1)}h`
+        : `needs 5+ entries spanning 24h+ to be a rate; have ` +
+          `${spend.sampleCount} over ${spend.hoursObserved.toFixed(1)}h`,
 
     runwayDays:
       vaultUsd === null || effectiveCostUsd <= 0 ? null : vaultUsd / effectiveCostUsd,
