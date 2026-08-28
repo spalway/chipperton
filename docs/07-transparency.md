@@ -68,11 +68,20 @@ reassemble from Solana; the endpoint is convenience, not disclosure.
 Orders that were refunded or expired return 404 with the reason — there was no
 delivery, so there is no report and never will be.
 
-## What is not published
+## What is not published, and what that does not mean
 
-The **payer wallet** is not on the report endpoint. The payment transaction is
-public on-chain like any Solana payment, so the information exists; this site
-simply does not put the buyer's address next to their report.
+The **payer wallet** is not in the report payload. That is not protection, and
+it should not be read as any.
+
+The link is open by another route:
+
+    orderId -> input        (public, on the report)
+    orderId -> paymentSig   (public, on the queue) -> Solscan -> payer wallet
+
+So which wallet requested a given report is reconstructible by anyone in two
+clicks. Omitting the field means this API does not assemble the join for you;
+it does not make it unavailable. Publishing reports in full is a deliberate
+transparency decision and this follows from it.
 
 An **access token** is still issued per order and still gates
 `/api/orders/:id`, which carries the payer wallet alongside everything else.

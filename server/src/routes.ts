@@ -420,8 +420,21 @@ app.post('/api/orders', async (c) => {
  * it appears inside the report body itself; gating a field that is printed in
  * the thing next to it would be theatre.
  *
- * `payerWallet` is NOT here. It is not part of the output, and this endpoint
- * publishes the work, not the buyer.
+ * `payerWallet` is not in this payload, but do NOT read that as protection.
+ * The join is fully open by another route:
+ *
+ *     orderId -> input        (here, public)
+ *     orderId -> paymentSig   (/api/queue, public) -> Solscan -> payer wallet
+ *
+ * So "this wallet looked up this address" is reconstructible by anyone in two
+ * clicks. Omitting the field only means this endpoint does not do the work for
+ * them; it does not make the link unavailable. Publishing reports is a
+ * deliberate transparency decision, and this is a consequence of it, not a
+ * gap in it — recorded here so nobody later mistakes the omission for a
+ * guarantee and builds on that assumption.
+ *
+ * If the join is ever meant to be closed, removing paymentSig/paymentUrl from
+ * the public queue is the change that would actually do it.
  */
 app.get('/api/reports/:id', async (c) => {
   const { data } = await db
