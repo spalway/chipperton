@@ -23,9 +23,23 @@ app.use(
   cors({
     origin: (origin) => {
       if (corsOrigins === '*') return origin ?? '*';
-      // Exact match only. Returning the request's origin when it is NOT on the
-      // list would echo any caller back to itself and defeat the whole point.
-      return corsOrigins.includes(origin?.replace(/\/$/, '') ?? '') ? origin : null;
+      const o = origin?.replace(/\/$/, '') ?? '';
+
+      // Exact match. Returning the request's origin when it is NOT on the list
+      // would echo any caller back to itself and defeat the whole point.
+      if (corsOrigins.includes(o)) return origin;
+
+      // Any local dev origin, on any port. Pinning specific ports does not
+      // work: Vite silently moves to the next free port, so an allowlist of
+      // 5173 blocks a dev server that happened to start on 5202 — which is
+      // exactly what this change originally did.
+      //
+      // Safe to allow: the API is public and unauthenticated, and the only
+      // secret it serves is a per-order access token passed as a query param.
+      // A page on someone's localhost gains nothing curl does not already have.
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o)) return origin;
+
+      return null;
     },
   }),
 );
