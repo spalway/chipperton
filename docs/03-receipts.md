@@ -53,14 +53,15 @@ guarantee, not a quality one. The agent can commit to a wrong conclusion just as
 firmly as a right one. What it removes is the possibility of quietly editing a
 report after the fact — including changing a verdict after a token moved.
 
-## Why only the hash goes on-chain
+## The report is on chain too
 
-The report body and the address you asked about never touch the chain.
+The hash is not a substitute for the report — both are published. The report
+body goes on chain as an ordered run of memo transactions, and the receipt
+commits to its hash. See **Transparency** for the chunk format and how to
+rebuild a report from Solana alone.
 
-Publishing the full report would make every query permanently public and
-joinable to the wallet that paid for it. Publishing the hash gives the buyer
-everything they need to verify, and gives an observer nothing about what was
-asked. See **Privacy**.
+The hash still matters: it is what makes the reassembled text checkable rather
+than merely present.
 
 ## Refunds are receipts too
 

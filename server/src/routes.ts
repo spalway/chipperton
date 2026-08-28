@@ -7,6 +7,7 @@ import { db, type Order, type Service } from './db.ts';
 import {
   agentSigner,
   explorerAddress,
+  explorerTx,
   explorerTxOrNull,
   rpcPay,
   vaultAddress,
@@ -183,7 +184,7 @@ app.get('/api/queue', async (c) => {
   const { data, error, count } = await db
     .from('orders')
     .select(
-      'id,service_id,status,currency,amount_lamports,created_at,paid_at,delivered_at,payment_sig,receipt_sig,eta_deadline,report_hash',
+      'id,service_id,status,currency,amount_lamports,created_at,paid_at,delivered_at,payment_sig,receipt_sig,eta_deadline,report_hash,report_chunk_sigs',
       { count: 'exact' },
     )
     .in('status', ['paid', 'running', 'delivered', 'refunded'])
@@ -261,6 +262,10 @@ app.get('/api/queue', async (c) => {
          *  when there is no signature — render the link or nothing. */
         paymentUrl: explorerTxOrNull(o.payment_sig),
         receiptUrl: explorerTxOrNull(o.receipt_sig),
+
+        /** Ordered memo txs carrying the full report body on-chain. */
+        reportChunkSigs: o.report_chunk_sigs ?? null,
+        reportChunkUrls: (o.report_chunk_sigs ?? []).map((s: string) => explorerTx(s)),
 
         /** PUBLIC on purpose. This hash is already broadcast on-chain inside
          *  the receipt memo (chp:1:done:<id>:<hash>), so gating it here would
@@ -406,7 +411,64 @@ app.post('/api/orders', async (c) => {
   });
 });
 
-/** PRIVATE. Full detail, including input/payer/report — access token required. */
+/**
+ * PUBLIC. The delivered report, in full.
+ *
+ * The same text is already published on-chain across the memo transactions in
+ * `chunkUrls`, so this endpoint is a convenience, not a disclosure — it serves
+ * what anyone can already reassemble from Solana. `input` is included because
+ * it appears inside the report body itself; gating a field that is printed in
+ * the thing next to it would be theatre.
+ *
+ * `payerWallet` is NOT here. It is not part of the output, and this endpoint
+ * publishes the work, not the buyer.
+ */
+app.get('/api/reports/:id', async (c) => {
+  const { data } = await db
+    .from('orders')
+    .select(
+      'id,service_id,input,status,report_hash,report_chunk_sigs,receipt_sig,delivered_at,paid_at',
+    )
+    .eq('id', c.req.param('id'))
+    .single();
+
+  if (!data) return c.json({ error: 'not found' }, 404);
+  if (data.status !== 'delivered') {
+    return c.json(
+      { error: `order ${data.id} is ${data.status} — no report was delivered`, status: data.status },
+      404,
+    );
+  }
+
+  const { data: report } = await db
+    .from('reports')
+    .select('body')
+    .eq('order_id', data.id)
+    .maybeSingle();
+
+  const chunkSigs: string[] = data.report_chunk_sigs ?? [];
+
+  return c.json({
+    orderId: data.id,
+    serviceId: data.service_id,
+    input: data.input,
+    paidAt: data.paid_at,
+    deliveredAt: data.delivered_at,
+    report: report?.body ?? null,
+    reportHash: data.report_hash,
+    receiptSig: data.receipt_sig,
+    receiptUrl: explorerTxOrNull(data.receipt_sig),
+    /** The report as published on Solana, in order. Concatenate each memo
+     *  after its `chp:1:rpt:<id>:<i>/<n>:` prefix to rebuild the body. */
+    chunkSigs,
+    chunkUrls: chunkSigs.map((s) => explorerTx(s)),
+    verify:
+      'sha256 the report body and take the first 16 hex characters; it must ' +
+      'equal reportHash, which is also in the receipt memo on-chain.',
+  });
+});
+
+/** Full detail including payerWallet — access token required. */
 app.get('/api/orders/:id', async (c) => {
   const token = c.req.query('token');
   if (!token) return c.json({ error: 'access token required' }, 401);
@@ -442,6 +504,8 @@ app.get('/api/orders/:id', async (c) => {
     paymentUrl: explorerTxOrNull(order.payment_sig),
     receiptUrl: explorerTxOrNull(order.receipt_sig),
     refundUrl: explorerTxOrNull(order.refund_sig),
+    reportChunkSigs: order.report_chunk_sigs ?? null,
+    reportChunkUrls: (order.report_chunk_sigs ?? []).map((s: string) => explorerTx(s)),
     reportHash: order.report_hash,
     refundSig: order.refund_sig,
     failureReason: order.failure_reason,

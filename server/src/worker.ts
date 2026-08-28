@@ -1,7 +1,7 @@
 import { REFUND_FEE_BUFFER, config } from './config.ts';
 import { db, type Order } from './db.ts';
 import { agentSigner, rpcPay } from './chain/clients.ts';
-import { sendRefund, writeReceipt } from './chain/receipt.ts';
+import { publishReport, sendRefund, writeReceipt } from './chain/receipt.ts';
 import { settleOrder } from './chain/settle.ts';
 import { runJob } from './services/index.ts';
 
@@ -174,6 +174,23 @@ async function workOne(): Promise<void> {
 
   try {
     const body = await runJob(order.service_id, order.input, order.id);
+
+    // Publish the report body BEFORE the receipt, so a receipt only ever
+    // exists for a report that fully landed. If a chunk fails partway, this
+    // throws and the job is refunded rather than being marked delivered with
+    // half a report on chain.
+    const published = await publishReport(order.id, body);
+    log(`published ${order.id} — ${published.bytes} bytes in ${published.chunks} txs`);
+
+    // Network fees are a real cost the agent pays. Recording them here is what
+    // makes the cost ledger cover more than inference.
+    await db.from('costs').insert({
+      order_id: order.id,
+      kind: 'fee',
+      usd: (published.chunks + 1) * 5000 * 1e-9 * (await solUsdForCosts()),
+      detail: { chunks: published.chunks, bytes: published.bytes, includesReceipt: true },
+    });
+
     const { signature, hash } = await writeReceipt(order.id, body);
 
     await db.from('reports').upsert({ order_id: order.id, body });
@@ -183,6 +200,7 @@ async function workOne(): Promise<void> {
         status: 'delivered',
         receipt_sig: signature,
         report_hash: hash,
+        report_chunk_sigs: published.signatures,
         delivered_at: new Date().toISOString(),
       })
       .eq('id', order.id);
@@ -227,4 +245,19 @@ if (process.argv[1]?.endsWith('worker.ts')) {
   setInterval(() => {
     tick().catch((e) => log('tick error', e));
   }, config.tickIntervalSeconds * 1000);
+}
+
+/** SOL price for costing network fees. Falls back to 0 rather than guessing —
+ *  a fabricated price in the cost ledger is worse than a missing one. */
+async function solUsdForCosts(): Promise<number> {
+  try {
+    const res = await fetch(
+      'https://lite-api.jup.ag/price/v3?ids=So11111111111111111111111111111111111111112',
+      { signal: AbortSignal.timeout(5000) },
+    );
+    const j = (await res.json()) as Record<string, { usdPrice?: number }>;
+    return j['So11111111111111111111111111111111111111112']?.usdPrice ?? 0;
+  } catch {
+    return 0;
+  }
 }

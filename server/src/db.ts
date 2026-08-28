@@ -49,6 +49,8 @@ export interface Order {
   delivered_at: string | null;
   receipt_sig: string | null;
   report_hash: string | null;
+  /** Ordered memo txs carrying the full report body on-chain. */
+  report_chunk_sigs: string[] | null;
   refund_sig: string | null;
   failure_reason: string | null;
   created_at: string;
