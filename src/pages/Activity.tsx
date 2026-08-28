@@ -9,9 +9,10 @@ export default function Activity({ go, openJob }: Props) {
       <h1>activity</h1>
       <div className="body">
         <p>
-          Every move Chipperton makes on chain, as it happens. Payments in, spending out, jobs
-          picked up and delivered, and the daily cost being drawn from the vault.{' '}
-          <b>Nothing here is written by hand</b> — each line is a confirmed transaction.
+          Every move Chipperton makes, as it happens — payments in, spending out, jobs picked up
+          and delivered. <b>Anything with a signature is a confirmed transaction you can open
+          yourself.</b> Rows without one are internal state, like declining a job or recomputing
+          runway, and are marked <em>no tx</em> rather than dressed up as on-chain events.
         </p>
       </div>
 

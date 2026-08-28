@@ -18,9 +18,12 @@ app.get('/api/status', async (c) => {
       rpcPay.getBalance(vaultAddress).send(),
       solPriceUsd(),
       db.from('agent_state').select('*').eq('id', 1).single(),
+      // head:true + count:'exact' asks Postgres to count. Reading data.length
+      // instead would silently cap at the PostgREST row limit and under-report
+      // a real backlog as soon as it got interesting.
       db
         .from('orders')
-        .select('status', { count: 'exact', head: false })
+        .select('id', { count: 'exact', head: true })
         .in('status', ['paid', 'running']),
       medianTurnaroundMinutes(),
       measuredDailyCostUsd(),
@@ -55,7 +58,7 @@ app.get('/api/status', async (c) => {
     runwayDays:
       vaultUsd === null || effectiveCostUsd <= 0 ? null : vaultUsd / effectiveCostUsd,
 
-    backlog: counts.data?.length ?? 0,
+    backlog: counts.count ?? 0,
     lastTickAt,
     tickIntervalSeconds: interval,
     // SCHEDULED, not guaranteed — the worker is a cron tick, not a promise.
@@ -111,25 +114,88 @@ app.get('/api/queue', async (c) => {
   // unless we distinguish them here.
   if (error) return c.json({ error: `queue unavailable: ${error.message}` }, 503);
 
-  const [services, solUsd] = await Promise.all([serviceMap(), solPriceUsd()]);
+  const [services, solUsd, measured] = await Promise.all([
+    serviceMap(),
+    solPriceUsd(),
+    medianTurnaroundMinutes(),
+  ]);
+
+  // Live queue estimate: position in the open queue x how long a job actually
+  // takes. Distinct from etaDeadline, which was committed at settle and never
+  // moves — the refund is owed against THAT, not against this.
+  const open = (data ?? [])
+    .filter((o) => o.status === 'paid' || o.status === 'running')
+    .sort((a, b) => Date.parse(a.paid_at ?? '') - Date.parse(b.paid_at ?? ''))
+    .map((o) => o.id);
 
   return c.json(
-    (data ?? []).map((o) => ({
-      id: o.id,
-      serviceId: o.service_id,
-      serviceName: services.get(o.service_id)?.name ?? o.service_id,
-      status: o.status,
-      currency: o.currency,
-      amountSol: o.amount_lamports / LAMPORTS_PER_SOL,
-      amountUsd: solUsd === null ? null : (o.amount_lamports / LAMPORTS_PER_SOL) * solUsd,
-      createdAt: o.created_at,
-      paidAt: o.paid_at,
-      deliveredAt: o.delivered_at,
-      etaDeadline: o.eta_deadline,
-      paymentSig: o.payment_sig,
-      receiptSig: o.receipt_sig,
-    })),
+    (data ?? []).map((o) => {
+      const svc = services.get(o.service_id);
+      const position = open.indexOf(o.id);
+      const perJob = measured ?? svc?.est_minutes ?? null;
+
+      return {
+        id: o.id,
+        serviceId: o.service_id,
+        serviceName: svc?.name ?? o.service_id,
+        status: o.status,
+        currency: o.currency,
+        amountSol: o.amount_lamports / LAMPORTS_PER_SOL,
+        amountUsd: solUsd === null ? null : (o.amount_lamports / LAMPORTS_PER_SOL) * solUsd,
+        createdAt: o.created_at,
+        paidAt: o.paid_at,
+        deliveredAt: o.delivered_at,
+
+        /** Committed at payment, immutable. The refund is owed against this. */
+        etaDeadline: o.eta_deadline,
+        /** Live ESTIMATE, moves as the queue drains. Never a promise. */
+        etaMinutes: position < 0 || perJob === null ? null : (position + 1) * perJob,
+        /** Whether etaMinutes came from observed turnaround or a declared
+         *  per-service guess. The UI must not call it measured unless this
+         *  says 'measured'. */
+        etaBasis: measured !== null ? 'measured' : 'declared',
+
+        paymentSig: o.payment_sig,
+        receiptSig: o.receipt_sig,
+      };
+    }),
   );
+});
+
+/**
+ * PUBLIC. What the agent has actually spent.
+ *
+ * Deliberately returns spend entries and totals only — no running balance and
+ * no "remaining" figure. The vault balance is COUNTED on-chain via /api/status;
+ * deriving it from this ledger instead would put an assumption upstream of a
+ * measurement, which is exactly backwards.
+ */
+app.get('/api/costs', async (c) => {
+  const { data, error } = await db
+    .from('costs')
+    .select('id,order_id,kind,usd,detail,created_at')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) return c.json({ error: `costs unavailable: ${error.message}` }, 503);
+
+  const rows = data ?? [];
+  const byKind: Record<string, number> = {};
+  for (const r of rows) byKind[r.kind] = (byKind[r.kind] ?? 0) + Number(r.usd);
+
+  return c.json({
+    entries: rows.map((r) => ({
+      id: r.id,
+      orderId: r.order_id,
+      kind: r.kind,
+      usd: Number(r.usd),
+      detail: r.detail,
+      createdAt: r.created_at,
+    })),
+    totalsByKind: byKind,
+    measuredDailyCostUsd: await measuredDailyCostUsd(),
+    note: 'Observed spend only. Vault balance is counted on-chain, not derived from this.',
+  });
 });
 
 /* ------------------------------------------------------------------ orders */

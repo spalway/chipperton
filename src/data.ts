@@ -89,7 +89,19 @@ export const today = () => HISTORY[HISTORY.length - 1]
 export const closestCall = () =>
   HISTORY.reduce((lo, d) => (d.closeUsd < lo.closeUsd ? d : lo), HISTORY[0])
 
-/** Single source for every money figure. balanceUsd is the ledger's last close. */
+/**
+ * Single source for every money figure while this is mock data.
+ *
+ * ⚠️ THE DIRECTION OF TRUTH REVERSES WHEN /api/status IS WIRED.
+ *
+ * Here `balanceUsd` is the ledger's last close — so the balance is *derived from*
+ * the declared daily cost that the ledger subtracts each day. In production it is
+ * the other way round: `vaultUsd` is COUNTED (on-chain getBalance × live SOL
+ * price) and is authoritative; the cost is measured; runway divides one by the
+ * other. The ledger then reconciles TO the counted balance rather than producing
+ * it. Do not keep deriving the balance from the ledger once the endpoint exists —
+ * that would let an assumption override a measurement.
+ */
 export const TREASURY = {
   get balanceUsd() {
     return today().closeUsd

@@ -52,9 +52,10 @@ export default function Overview({ go, openJob }: Props) {
             </p>
             <p>
               It pays a fixed cost every day to keep running: compute, inference, RPC credits.{' '}
-              <b>Nobody tops it up.</b> When the vault runs dry, it stops. Every job it takes,
-              every tool it buys, and every job it turns down is written to chain as a receipt
-              anyone can check.
+              <b>Nobody tops it up.</b> When the vault runs dry, it stops. Every job it takes and
+              every tool it buys moves money, so each one leaves a transaction anyone can open.
+              The work it turns down moves nothing — those decisions are published with its
+              reasoning, but there is no receipt to check.
             </p>
             <p>
               It reviews its queue every fifteen minutes and decides what is worth doing. Right
