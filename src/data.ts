@@ -173,6 +173,24 @@ export const intervalLabel = (seconds: number): string => {
 }
 
 /**
+ * How long until something scheduled happens.
+ *
+ * `Math.round(seconds / 60)` renders "in ~0 min" for anything under thirty
+ * seconds, which reads as "not happening" rather than "imminent" — and once
+ * the worker moved to a 60s tick, that was the value on screen essentially
+ * always. Same failure as a 25-second turnaround rendering as "0 min".
+ *
+ * Zero and below is "due now" rather than a number, because a tick that is
+ * already overdue is not usefully described as "in ~0".
+ */
+export const dueLabel = (seconds: number): string | null => {
+  if (!Number.isFinite(seconds)) return null
+  if (seconds <= 0) return 'due now'
+  if (seconds < 60) return `in ~${Math.round(seconds)} sec`
+  return `in ~${Math.round(seconds / 60)} min`
+}
+
+/**
  * What an ETA is actually based on, in words.
  *
  * 'declared' is the service's configured time — a target nobody has met yet.

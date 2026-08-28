@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chipsPriceSol, intervalLabel, sol, usdApprox } from './data'
+import { chipsPriceSol, dueLabel, intervalLabel, sol, usdApprox } from './data'
 import {
   COST_LINES,
   DAILY_COST_USD,
@@ -213,5 +213,29 @@ describe('intervalLabel — the tick that dropped from 900s to 60s', () => {
   it('does not print a fake number for a nonsense interval', () => {
     expect(intervalLabel(0)).toBe('tick')
     expect(intervalLabel(Number.NaN)).toBe('tick')
+  })
+})
+
+describe('dueLabel — sub-minute countdowns after the tick dropped to 60s', () => {
+  it('does not render an imminent tick as "in ~0 min"', () => {
+    // Math.round(20/60) is 0, so the page read "in ~0 min" — which says
+    // "not happening" rather than "about to". At a 60s tick that was the
+    // value on screen almost always.
+    expect(dueLabel(20)).toBe('in ~20 sec')
+    expect(dueLabel(59)).toBe('in ~59 sec')
+  })
+
+  it('says "due now" rather than a number once it is overdue', () => {
+    expect(dueLabel(0)).toBe('due now')
+    expect(dueLabel(-30)).toBe('due now')
+  })
+
+  it('uses minutes once there are minutes to report', () => {
+    expect(dueLabel(60)).toBe('in ~1 min')
+    expect(dueLabel(540)).toBe('in ~9 min')
+  })
+
+  it('returns nothing rather than a fake countdown for a bad timestamp', () => {
+    expect(dueLabel(Number.NaN)).toBeNull()
   })
 })

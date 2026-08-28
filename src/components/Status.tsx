@@ -1,6 +1,7 @@
 import {
   AGENT,
   COST_BASIS,
+  dueLabel,
   intervalLabel,
   TREASURY,
   openJobs,
@@ -15,9 +16,11 @@ import { useLiveData } from '../useLiveData'
 
 type Props = { go: (v: View) => void; openJob?: (id: string | null) => void }
 
-const mins = (iso: string | null) => {
+/** Seconds until an ISO timestamp. Kept in seconds so the label can choose
+ *  its own unit — rounding to minutes here is what produced "in ~0 min". */
+const secondsUntil = (iso: string | null) => {
   if (!iso) return null
-  const d = Math.round((Date.parse(iso) - Date.now()) / 60000)
+  const d = (Date.parse(iso) - Date.now()) / 1000
   return Number.isFinite(d) ? d : null
 }
 
@@ -34,7 +37,8 @@ export default function Status({ go, openJob }: Props) {
   const s = live.source === 'live' ? live.status : null
 
   const tick = useCountdown(AGENT.reviewMinutes, s?.nextTickAt ?? null)
-  const nextIn = s ? mins(s.nextTickAt) : null
+  const nextIn = s ? secondsUntil(s.nextTickAt) : null
+  const due = nextIn == null ? null : dueLabel(nextIn)
 
   const link = (v: View, label: string, tone: string, onClick?: () => void) => (
     <a
@@ -98,8 +102,7 @@ export default function Status({ go, openJob }: Props) {
           <div className="k">Next decision</div>
           <div className="v">{tick.label}</div>
           <div className="s">
-            scheduled{nextIn != null ? ` · in ~${Math.max(nextIn, 0)} min` : ''} · every{' '}
-            {intervalLabel(s.tickIntervalSeconds)}
+            scheduled{due ? ` · ${due}` : ''} · every {intervalLabel(s.tickIntervalSeconds)}
           </div>
           {link('decisions', 'decisions →', 'red')}
         </div>
