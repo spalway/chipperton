@@ -1,5 +1,12 @@
 import { useState } from 'react'
-import { chipsPrice, measuredTurnaroundMins, turnaroundLabel, usd, type Service } from '../data'
+import {
+  chipsPriceSol,
+  measuredTurnaroundMins,
+  sol,
+  turnaroundLabel,
+  usdApprox,
+  type Service,
+} from '../data'
 import { useResolved } from '../useLiveData'
 import Motto from '../components/Motto'
 import BuyPanel from '../components/BuyPanel'
@@ -93,9 +100,13 @@ export default function Shop() {
               <div className="top">
                 <span className="n">{s.name}</span>
                 <span className="pz">
-                  {usd(s.price)}
+                  {/* SOL leads because it is exact and it is what the wallet
+                      charges. The USD conversion floats and can be null, so it
+                      can never be the only price on the card. */}
+                  {sol(s.priceSol)}
+                  {usdApprox(s.price) && <s className="approx">{usdApprox(s.price)}</s>}
                   {/* only quote the discounted price when it can actually be paid */}
-                  {s.active && chipsEnabled && <s>{chipsPrice(s.price)} in chips</s>}
+                  {s.active && chipsEnabled && <s>{chipsPriceSol(s.priceSol)} in chips</s>}
                 </span>
               </div>
               <div className="d">{s.long}</div>

@@ -157,12 +157,43 @@ export const turnaroundLabel = (mins: number) => {
 export const usd = (n: number) =>
   `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+/**
+ * A SOL amount, exact.
+ *
+ * Derived from lamports, so it is a whole number of the smallest unit and can
+ * be stated without hedging — this is the figure the transaction transfers and
+ * the one the buyer actually signs. Trailing zeros are trimmed rather than
+ * padded to a fixed width, which would imply precision the amount does not use.
+ */
+export const sol = (n: number) => `${n.toFixed(9).replace(/\.?0+$/, '')} SOL`
+
+/**
+ * A USD conversion, marked as approximate.
+ *
+ * The server recomputes this per request from a 30-second cached SOL price, so
+ * it genuinely differs between page loads. Printing `$5.34` for a number that
+ * moves overclaims in the same way the raw 0.42136666666666667 turnaround did —
+ * the tilde is doing real work.
+ *
+ * Returns null when there is no conversion, so callers render nothing rather
+ * than a zero. A price feed outage must not become "$0.00".
+ */
+export const usdApprox = (n: number | null | undefined) =>
+  n == null ? null : `~${usd(n)}`
+
 export type Service = {
   id: string
   name: string
   short: string
   long: string
-  price: number
+  /**
+   * USD, and NULLABLE — the server omits it when the price feed fails. It is
+   * a floating approximation; `priceSol` is the exact figure that gets charged,
+   * so nothing may depend on this being present.
+   */
+  price: number | null
+  /** Exact. What the transaction transfers, and what the buyer signs. */
+  priceSol: number
   turnaround: string
   /**
    * Mirrors `active` from GET /api/services. Drives whether a service is
@@ -172,9 +203,19 @@ export type Service = {
   active: boolean
 }
 
-/** price × 0.9, formatted — the $CHIPS discount is derived, never hand-typed. */
-export const chipsPrice = (usd: number) =>
-  `$${(usd * (1 - CHIPS.discountPct / 100)).toFixed(2)}`
+/**
+ * price × 0.9 — the $CHIPS discount is derived, never hand-typed.
+ *
+ * Applied to the exact SOL figure, so the discounted price is as exact as the
+ * one it comes from. Passing the floating USD conversion in here would compound
+ * an approximation into a number that looks like a quote.
+ */
+export const chipsPriceSol = (priceSol: number) =>
+  sol(priceSol * (1 - CHIPS.discountPct / 100))
+
+/** USD equivalent of the discount. Null in, null out — never "$0.00". */
+export const chipsPrice = (usd: number | null | undefined) =>
+  usd == null ? null : `$${(usd * (1 - CHIPS.discountPct / 100)).toFixed(2)}`
 
 /**
  * What each service needs you to type, and what shape it has to be.
@@ -247,6 +288,7 @@ export const SERVICES: Service[] = [
     short: 'Mint & freeze authority, LP status, holder concentration',
     long: 'Mint and freeze authority, LP status and lock, holder concentration, top-10 supply share, and whether the deployer still holds.',
     price: 6,
+    priceSol: 0.05,
     turnaround: '~8 min',
     active: true,
   },
@@ -256,6 +298,7 @@ export const SERVICES: Service[] = [
     short: 'Follow funds up to 6 hops, flag CEX deposits and mixers',
     long: 'Follows funds from a starting signature up to six hops, flagging exchange deposits, known mixers, and wallets that recombine.',
     price: 9,
+    priceSol: 0.085,
     turnaround: '~20 min',
     active: true,
   },
@@ -265,6 +308,7 @@ export const SERVICES: Service[] = [
     short: '90-day summary: counterparties, volume, programs used',
     long: '90 days of an address: counterparties, inflow and outflow, programs it touches most, and the pattern of when it acts.',
     price: 4,
+    priceSol: 0.04,
     turnaround: '~12 min',
     active: true,
   },
@@ -274,6 +318,7 @@ export const SERVICES: Service[] = [
     short: 'Wallets funded from a common source around a launch',
     long: 'Finds wallets funded from a common source in the minutes around a launch, and estimates how much of supply they took.',
     price: 12,
+    priceSol: 0.11,
     turnaround: '~25 min',
     active: true,
   },
@@ -283,6 +328,7 @@ export const SERVICES: Service[] = [
     short: "Plain-English summary of a program's instructions",
     long: "Reads a program's IDL and explains in plain English what each instruction does, what it can touch, and which accounts hold authority.",
     price: 8,
+    priceSol: 0.075,
     turnaround: '~18 min',
     active: true,
   },
@@ -292,6 +338,7 @@ export const SERVICES: Service[] = [
     short: 'Monitors up to 25 addresses, reports once a day',
     long: 'Watches up to 25 addresses and reports movements once a day — new positions, exits, and transfers above a threshold you set.',
     price: 15,
+    priceSol: 0.14,
     turnaround: 'per week',
     active: true,
   },
@@ -352,7 +399,10 @@ export type Job = {
   service: string
   /** SOL | USDC | $CHIPS */
   payer: string
-  amountUsd: number
+  /** Exact — what actually moved. */
+  amountSol: number
+  /** Floating conversion, and null when the price feed failed. Never alone. */
+  amountUsd: number | null
   chips: boolean
   status: 'running' | 'queued' | 'delivered' | 'refunded' | 'expired'
   /** live estimate — queuePosition × median service minutes, moves as the queue drains */
@@ -392,43 +442,43 @@ export type JobPrivate = {
 
 export const JOBS: Job[] = [
   {
-    id: '#0412', rawId: '0412', service: 'Token safety check', payer: '$CHIPS', amountUsd: 5.4, chips: true,
+    id: '#0412', rawId: '0412', service: 'Token safety check', payer: '$CHIPS', amountSol: 0.045, amountUsd: 5.4, chips: true,
     status: 'running', awaitingDelivery: true, terminal: false, etaMinutes: 3, etaDeadline: '12:12', deliveredAt: null,
     createdAt: '12:04:11', paidAt: '12:04:33', paymentSig: '5xQ2…mb3z',
     receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0411', rawId: '0411', service: 'Transaction trace', payer: 'USDC', amountUsd: 9, chips: false,
+    id: '#0411', rawId: '0411', service: 'Transaction trace', payer: 'USDC', amountSol: 0.085, amountUsd: 9, chips: false,
     status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 23, etaDeadline: '12:12', deliveredAt: null,
     createdAt: '11:51:50', paidAt: '11:52:18', paymentSig: '7bTn…Lp4w',
     receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0410', rawId: '0410', service: 'Wallet activity report', payer: '$CHIPS', amountUsd: 3.6, chips: true,
+    id: '#0410', rawId: '0410', service: 'Wallet activity report', payer: '$CHIPS', amountSol: 0.036, amountUsd: 3.6, chips: true,
     status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 35, etaDeadline: '11:10', deliveredAt: null,
     createdAt: '10:57:44', paidAt: '10:58:12', paymentSig: '8mCd…Yu2p',
     receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0409', rawId: '0409', service: 'Bundle / cluster detection', payer: 'SOL', amountUsd: 12, chips: false,
+    id: '#0409', rawId: '0409', service: 'Bundle / cluster detection', payer: 'SOL', amountSol: 0.11, amountUsd: 12, chips: false,
     status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 60, etaDeadline: '10:28', deliveredAt: null,
     createdAt: '10:02:51', paidAt: '10:03:19', paymentSig: '6Vb2…Ax5j',
     receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0408', rawId: '0408', service: 'Program IDL brief', payer: '$CHIPS', amountUsd: 7.2, chips: true,
+    id: '#0408', rawId: '0408', service: 'Program IDL brief', payer: '$CHIPS', amountSol: 0.0675, amountUsd: 7.2, chips: true,
     status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '11:06', deliveredAt: '11:04',
     createdAt: '10:47:39', paidAt: '10:48:11', paymentSig: '2Hx9…Rt6v',
     receiptSig: '2Hx9…Rt6v', reportHash: 'a4f9c118…7e21', paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0407', rawId: '0407', service: 'Token safety check', payer: 'SOL', amountUsd: 6, chips: false,
+    id: '#0407', rawId: '0407', service: 'Token safety check', payer: 'SOL', amountSol: 0.05, amountUsd: 6, chips: false,
     status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '10:42', deliveredAt: '10:41',
     createdAt: '10:33:30', paidAt: '10:34:02', paymentSig: '1Pw4…Gh8n',
     receiptSig: '4Nq7…Zk9s', reportHash: 'c2b7e04d…9f13', paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0406', rawId: '0406', service: 'Watchlist digest', payer: '$CHIPS', amountUsd: 13.5, chips: true,
+    id: '#0406', rawId: '0406', service: 'Watchlist digest', payer: '$CHIPS', amountSol: 0.126, amountUsd: 13.5, chips: true,
     status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '09:14', deliveredAt: '09:00',
     createdAt: '08:13:58', paidAt: '08:14:22', paymentSig: '3Rk8…Bn2f',
     receiptSig: '5Tz6…Kv1c', reportHash: '77d1a35b…4c08', paymentUrl: null, receiptUrl: null,

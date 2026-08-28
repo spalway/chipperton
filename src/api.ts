@@ -62,10 +62,19 @@ export type ServiceResponse = {
   name: string
   short: string
   long: string
+  /** Source of truth — what the transaction actually transfers. */
   priceLamports: number
+  /** Exact and stable. Safe to state flatly. */
   priceSol: number
-  /** Floats off the live SOL price — moves between requests. Do not cache. */
-  priceUsd: number
+  /**
+   * Derived per request from a 30s-cached SOL price, so it genuinely moves
+   * between page loads — and it is NULL whenever the price feed fails, because
+   * the server returns nothing rather than a stale or invented number.
+   *
+   * Two consequences: never render it as a precise figure, and never let it be
+   * the only price on a card, or a feed outage leaves an item with no price.
+   */
+  priceUsd: number | null
   estMinutes: number
   /** false → render as "soon", not orderable. */
   active: boolean
@@ -77,8 +86,10 @@ export type QueueResponse = {
   serviceName: string
   status: 'queued' | 'running' | 'delivered' | 'refunded' | 'expired'
   currency: string
+  /** What was actually transferred. Exact. */
   amountSol: number
-  amountUsd: number
+  /** Same nullable, floating conversion as `priceUsd` — see ServiceResponse. */
+  amountUsd: number | null
   createdAt: string
   paidAt: string | null
   /** Live estimate — moves as the queue drains. */

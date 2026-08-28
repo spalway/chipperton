@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { chipsPriceSol, sol, usdApprox } from './data'
 import {
   COST_LINES,
   DAILY_COST_USD,
@@ -138,8 +139,39 @@ describe('privacy — the public job shape must not carry payer data', () => {
 describe('pricing', () => {
   it('the $CHIPS price is derived at exactly 10% off, never hand-typed', () => {
     for (const s of SERVICES) {
-      expect(chipsPrice(s.price)).toBe(`$${(s.price * 0.9).toFixed(2)}`)
+      expect(chipsPriceSol(s.priceSol)).toBe(sol(s.priceSol * 0.9))
+      if (s.price != null) {
+        expect(chipsPrice(s.price)).toBe(`$${(s.price * 0.9).toFixed(2)}`)
+      }
     }
+  })
+
+  it('every service carries an exact SOL price, which is never null', () => {
+    // priceUsd can vanish when the price feed fails; priceSol cannot, which is
+    // why it is the figure the cards lead with.
+    for (const s of SERVICES) {
+      expect(typeof s.priceSol).toBe('number')
+      expect(s.priceSol).toBeGreaterThan(0)
+    }
+  })
+
+  it('renders SOL exactly, without inventing precision', () => {
+    expect(sol(0.05)).toBe('0.05 SOL')
+    expect(sol(0.0675)).toBe('0.0675 SOL')
+    expect(sol(1)).toBe('1 SOL')
+  })
+
+  it('marks the USD conversion as approximate', () => {
+    // It is recomputed per request from a 30s-cached SOL price, so a bare
+    // "$5.34" claims a precision that expires in half a minute.
+    expect(usdApprox(5.337107204740733)).toBe('~$5.34')
+  })
+
+  it('returns nothing — never $0.00 — when the price feed gave no conversion', () => {
+    // A feed outage rendering as "$0.00" would advertise the job as free.
+    expect(usdApprox(null)).toBeNull()
+    expect(usdApprox(undefined)).toBeNull()
+    expect(chipsPrice(null)).toBeNull()
   })
 })
 

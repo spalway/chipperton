@@ -3,8 +3,9 @@ import {
   DECISIONS,
   measuredTurnaroundMins,
   runwayDays,
+  sol,
   turnaroundLabel,
-  usd,
+  usdApprox,
   type View,
 } from '../data'
 import Motto from '../components/Motto'
@@ -168,7 +169,9 @@ export default function Overview({ go, openJob }: Props) {
                 <div className="d">{s.short}</div>
               </div>
               <div className="r">
-                <div className="pz">{usd(s.price)}</div>
+                <div className="pz">{sol(s.priceSol)}</div>
+                {/* absent, not zero, when the price feed is down */}
+                {usdApprox(s.price) && <div className="pzu">{usdApprox(s.price)}</div>}
                 <div className="tt">{s.active ? s.turnaround : 'soon'}</div>
               </div>
             </div>
@@ -209,7 +212,17 @@ export default function Overview({ go, openJob }: Props) {
                 <td className="id">{j.id}</td>
                 <td className="nm">{j.service}</td>
                 <td className="pay">
-                  {j.chips ? <b>{j.payer}</b> : j.payer} · {usd(j.amountUsd)}
+                  {/* the amount already says SOL, so the payer label is only
+                      worth showing when it is something else */}
+                  {j.chips && (
+                    <>
+                      <b>{j.payer}</b>{' · '}
+                    </>
+                  )}
+                  {sol(j.amountSol)}
+                  {usdApprox(j.amountUsd) && (
+                    <span className="mut"> · {usdApprox(j.amountUsd)}</span>
+                  )}
                 </td>
                 <td
                   className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : j.terminal ? ' ref' : ''}`}

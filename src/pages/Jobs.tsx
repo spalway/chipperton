@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { JOB_PRIVATE, usd, type Job, type View } from '../data'
+import { JOB_PRIVATE, sol, usdApprox, type Job, type View } from '../data'
 import { useResolved } from '../useLiveData'
 import { useReport } from '../useReport'
 
@@ -107,7 +107,10 @@ function Detail({
         <div className="jf">
           <div className="k">Paid</div>
           <div className={`v${job.chips ? ' g' : ''}`}>
-            {usd(job.amountUsd)} in {job.payer}
+            {sol(job.amountSol)} in {job.payer}
+            {usdApprox(job.amountUsd) && (
+              <span className="mut"> · {usdApprox(job.amountUsd)}</span>
+            )}
           </div>
         </div>
         <div className="jf">
@@ -264,7 +267,15 @@ export default function Jobs({ jobId, openJob }: Props) {
                 <td className="id">{j.id}</td>
                 <td className="nm">{j.service}</td>
                 <td className="pay">
-                  {j.chips ? <b>{j.payer}</b> : j.payer} · {usd(j.amountUsd)}
+                  {j.chips && (
+                    <>
+                      <b>{j.payer}</b>{' · '}
+                    </>
+                  )}
+                  {sol(j.amountSol)}
+                  {usdApprox(j.amountUsd) && (
+                    <span className="mut"> · {usdApprox(j.amountUsd)}</span>
+                  )}
                 </td>
                 <td className="pay">{j.paidAt}</td>
                 <td

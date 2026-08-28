@@ -47,8 +47,10 @@ export function buildActivity(queue: QueuePage | null, costs: CostsResponse | nu
         at: j.paidAt,
         kind: 'in',
         action: 'IN',
-        msg: `${money(j.amountUsd)} in for ${j.serviceName}`,
-        note: `order ${j.id}`,
+        // the SOL figure is what actually arrived; the USD conversion floats and
+        // is null when the price feed fails, so it is an aside, never the claim
+        msg: `${j.amountSol} SOL in for ${j.serviceName}`,
+        note: j.amountUsd == null ? `order ${j.id}` : `order ${j.id} · ~${money(j.amountUsd)}`,
         sig: j.paymentSig,
         url: j.paymentUrl,
       })

@@ -13,8 +13,10 @@ export const adaptService = (s: ServiceResponse): Service => ({
   name: s.name,
   short: s.short,
   long: s.long,
-  // priceUsd floats off the live SOL price, so it is read per render, never cached
+  // priceUsd floats off the live SOL price and is null when the feed fails, so
+  // it is read per render, never cached, and never the only price shown
   price: s.priceUsd,
+  priceSol: s.priceSol,
   turnaround: `~${s.estMinutes} min`,
   active: s.active,
 })
@@ -33,6 +35,9 @@ export const adaptQueueRow = (q: QueueResponse): Job => ({
   rawId: q.id,
   service: q.serviceName,
   payer: CURRENCY_LABEL[q.currency] ?? q.currency,
+  // exact first, approximate second — same rule as the shop, so a queue row and
+  // a service card cannot disagree about which figure is authoritative
+  amountSol: q.amountSol,
   amountUsd: q.amountUsd,
   chips: q.currency.toUpperCase().includes('CHIPS'),
   // pass the server's status through verbatim — collapsing 'refunded' into

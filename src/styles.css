@@ -455,3 +455,9 @@
     .ovl{padding:52px 12px 24px}
     .wmenu{min-width:190px}
   }
+
+  /* SOL is exact and leads; the USD conversion floats and is marked approximate */
+  .item .pz s.approx{color:var(--muted);font-weight:400}
+  .svc .pzu{font-family:var(--mono);font-size:9.5px;color:var(--faint);
+    font-variant-numeric:tabular-nums;margin-top:1px}
+  .qt .pay .mut{color:var(--faint)}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { inputSpec, usd, type Service } from '../data'
+import { inputSpec, sol, usdApprox, type Service } from '../data'
 import { isSignature, isSolanaAddress, short } from '../wallet'
 import { useWallet } from '../WalletProvider'
 import { useOrderFlow } from '../useOrderFlow'
@@ -70,7 +70,12 @@ export default function BuyPanel({ service, onClose }: { service: Service; onClo
 
             <div className="brow">
               <span className="bk">Price</span>
-              <span className="bv">{usd(service.price)}</span>
+              <span className="bv">
+                {sol(service.priceSol)}
+                {usdApprox(service.price) && (
+                  <span className="mut"> · {usdApprox(service.price)}</span>
+                )}
+              </span>
             </div>
             <div className="brow">
               <span className="bk">Estimate</span>
@@ -114,7 +119,9 @@ export default function BuyPanel({ service, onClose }: { service: Service; onClo
             </div>
             <div className="brow">
               <span className="bk">Amount</span>
-              <span className="bv big">{flow.quote.amountSol} SOL</span>
+              {/* the quote is denominated in lamports and carries no USD at all —
+                  this is exactly what the wallet will be asked to transfer */}
+              <span className="bv big">{sol(flow.quote.amountSol)}</span>
             </div>
             <div className="brow">
               <span className="bk">Estimate</span>
