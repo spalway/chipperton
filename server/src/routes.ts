@@ -100,6 +100,19 @@ app.get('/api/status', async (c) => {
       .gte('delivered_at', startOfDay.toISOString()),
   ]);
 
+  // Cheapest ORDERABLE service — what the agent would need to cover to reopen.
+  // Using the cheapest rather than an average keeps the agenda's stated
+  // threshold the true one: this is the smallest sale it could accept.
+  const { data: activeSvcs } = await db
+    .from('services')
+    .select('price_lamports')
+    .eq('active', true)
+    .order('price_lamports', { ascending: true })
+    .limit(1);
+  const cheapestActive = activeSvcs?.[0]?.price_lamports
+    ? Number(activeSvcs[0].price_lamports)
+    : null;
+
   // Empty string in the column is treated as unset — a blank is far likelier
   // to be someone clearing the field than a deliberate value.
   const chipsMint = (state.data?.chips_mint || null) as string | null;
@@ -197,8 +210,116 @@ app.get('/api/status', async (c) => {
 
     twitterHandle,
     twitterUrl: twitterHandle ? `https://x.com/${twitterHandle}` : null,
+
+    /**
+     * What the agent is currently blocked on or working through.
+     *
+     * Every item is DERIVED from state elsewhere in this same response, and
+     * every one names the condition that removes it. Nothing here is written
+     * ahead of time — the list empties on its own as each condition clears,
+     * and an empty list means the agent is simply running.
+     *
+     * This replaces a hand-written activity feed. Invented entries would be
+     * indistinguishable from real ones to a reader, which is the failure this
+     * whole project keeps finding.
+     */
+    agenda: buildAgenda({
+      canHonourRefunds: Number(hotBalance) >= refundLiability + REFUND_FEE_BUFFER,
+      hotWalletLamports: Number(hotBalance),
+      refundLiabilityLamports: refundLiability,
+      cheapestServiceLamports: cheapestActive,
+      chipsMint,
+      payCluster: config.payCluster,
+      backlog: counts.count ?? 0,
+      everDelivered: turnaround !== null,
+      dailyCostBasis: basis,
+    }),
   });
 });
+
+interface AgendaInput {
+  canHonourRefunds: boolean;
+  hotWalletLamports: number;
+  refundLiabilityLamports: number;
+  cheapestServiceLamports: number | null;
+  chipsMint: string | null;
+  payCluster: string;
+  backlog: number;
+  everDelivered: boolean;
+  dailyCostBasis: string;
+}
+
+/** Ordered most-blocking first. Only conditions that are currently true appear. */
+function buildAgenda(s: AgendaInput) {
+  const sol = (n: number) => `${(n / LAMPORTS_PER_SOL).toFixed(4)} SOL`;
+  const items: { kind: 'blocked' | 'waiting' | 'working'; title: string; detail: string; clearsWhen: string }[] = [];
+
+  if (!s.canHonourRefunds) {
+    const needed = s.refundLiabilityLamports + (s.cheapestServiceLamports ?? 0) + REFUND_FEE_BUFFER;
+    items.push({
+      kind: 'blocked',
+      title: 'Not accepting orders',
+      detail:
+        `The refund wallet holds ${sol(s.hotWalletLamports)}. Taking the cheapest job ` +
+        `would put it on the hook for ${sol(needed)} including everything already owed. ` +
+        `It will not sell what it could not refund, so the shop is closed.`,
+      clearsWhen: 'the refund wallet can cover a job plus its outstanding book',
+    });
+  }
+
+  if (s.chipsMint === null) {
+    items.push({
+      kind: 'waiting',
+      title: '$CHIPS not launched',
+      detail:
+        `No mint address is set, so the ${config.chipsDiscountPct}% discount cannot be ` +
+        'honoured and paying in $CHIPS is disabled rather than advertised.',
+      clearsWhen: 'the mint address is set',
+    });
+  }
+
+  if (s.payCluster !== 'mainnet-beta') {
+    items.push({
+      kind: 'waiting',
+      title: `Running on ${s.payCluster}`,
+      detail: 'Transactions are real but the money is not. Nothing here is a live payment.',
+      clearsWhen: 'payments move to mainnet',
+    });
+  }
+
+  if (s.backlog > 0) {
+    items.push({
+      kind: 'working',
+      title: `${s.backlog} job${s.backlog === 1 ? '' : 's'} in the queue`,
+      detail: 'Worked oldest-paid-first, one per tick, regardless of who paid most.',
+      clearsWhen: 'the queue drains',
+    });
+  }
+
+  if (!s.everDelivered) {
+    items.push({
+      kind: 'waiting',
+      title: 'Nothing delivered yet',
+      detail:
+        'Turnaround is measured from two on-chain timestamps, so there is no figure ' +
+        'to report until a first job completes.',
+      clearsWhen: 'the first job is delivered',
+    });
+  }
+
+  if (s.dailyCostBasis === 'declared') {
+    items.push({
+      kind: 'waiting',
+      title: 'Operating cost is declared, not measured',
+      detail:
+        'Runway currently divides a real balance by an assumed daily cost. The ledger ' +
+        'needs enough history before that figure can be observed rather than stated.',
+      clearsWhen: '5+ cost entries span 24h+',
+    });
+  }
+
+  return items;
+}
 
 /* ---------------------------------------------------------------- services */
 
