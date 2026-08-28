@@ -4,7 +4,13 @@ import { cors } from 'hono/cors';
 import { address } from '@solana/kit';
 import { REFUND_FEE_BUFFER, chipsEnabled, config } from './config.ts';
 import { db, type Order, type Service } from './db.ts';
-import { agentSigner, rpcPay, vaultAddress } from './chain/clients.ts';
+import {
+  agentSigner,
+  explorerAddress,
+  explorerTxOrNull,
+  rpcPay,
+  vaultAddress,
+} from './chain/clients.ts';
 import { LAMPORTS_PER_SOL, buildOrderTransaction, newReference } from './chain/orders.ts';
 
 export const app = new Hono();
@@ -68,6 +74,9 @@ app.get('/api/status', async (c) => {
 
   return c.json({
     vaultAddress: vaultAddress.toString(),
+    vaultUrl: explorerAddress(vaultAddress.toString()),
+    hotWalletAddress: agentSigner.address.toString(),
+    hotWalletUrl: explorerAddress(agentSigner.address.toString()),
     vaultLamports,
     vaultUsd,
 
@@ -247,6 +256,12 @@ app.get('/api/queue', async (c) => {
         paymentSig: o.payment_sig,
         receiptSig: o.receipt_sig,
 
+        /** Prebuilt explorer links. Built server-side so the cluster can never
+         *  drift out of sync with where the payment actually settled. Null
+         *  when there is no signature — render the link or nothing. */
+        paymentUrl: explorerTxOrNull(o.payment_sig),
+        receiptUrl: explorerTxOrNull(o.receipt_sig),
+
         /** PUBLIC on purpose. This hash is already broadcast on-chain inside
          *  the receipt memo (chp:1:done:<id>:<hash>), so gating it here would
          *  protect nothing while implying it was protected. It is also the
@@ -424,6 +439,9 @@ app.get('/api/orders/:id', async (c) => {
     deliveredAt: order.delivered_at,
     paymentSig: order.payment_sig,
     receiptSig: order.receipt_sig,
+    paymentUrl: explorerTxOrNull(order.payment_sig),
+    receiptUrl: explorerTxOrNull(order.receipt_sig),
+    refundUrl: explorerTxOrNull(order.refund_sig),
     reportHash: order.report_hash,
     refundSig: order.refund_sig,
     failureReason: order.failure_reason,

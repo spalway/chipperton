@@ -52,7 +52,27 @@ async function loadAgentSigner() {
 
 export const agentSigner = await loadAgentSigner();
 
+/**
+ * Explorer links are built HERE, not in the client.
+ *
+ * The cluster is a server concern — payments are on devnet today and move to
+ * mainnet later. A client that hardcodes `?cluster=devnet` keeps rendering
+ * links that resolve, to the wrong chain, on the day we flip. Nothing would
+ * error; every signature would simply not be found, or worse, collide.
+ */
+function clusterQuery(): string {
+  return config.payCluster === 'mainnet-beta' ? '' : `?cluster=${config.payCluster}`;
+}
+
 export function explorerTx(signature: string): string {
-  const q = config.payCluster === 'mainnet-beta' ? '' : `?cluster=${config.payCluster}`;
-  return `https://solscan.io/tx/${signature}${q}`;
+  return `https://solscan.io/tx/${signature}${clusterQuery()}`;
+}
+
+export function explorerAddress(addr: string): string {
+  return `https://solscan.io/account/${addr}${clusterQuery()}`;
+}
+
+/** null in, null out — so a client can render the link or nothing at all. */
+export function explorerTxOrNull(signature: string | null): string | null {
+  return signature ? explorerTx(signature) : null;
 }
