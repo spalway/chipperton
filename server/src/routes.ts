@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { address } from '@solana/kit';
-import { REFUND_FEE_BUFFER, chipsEnabled, config } from './config.ts';
+import { REFUND_FEE_BUFFER, chipsEnabled, config, corsOrigins } from './config.ts';
+import { rateLimit } from './ratelimit.ts';
 import { db, type Order, type Service } from './db.ts';
 import {
   agentSigner,
@@ -16,7 +17,34 @@ import {
 import { LAMPORTS_PER_SOL, buildOrderTransaction, newReference } from './chain/orders.ts';
 
 export const app = new Hono();
-app.use('/*', cors({ origin: config.corsOrigin }));
+
+app.use(
+  '/*',
+  cors({
+    origin: (origin) => {
+      if (corsOrigins === '*') return origin ?? '*';
+      // Exact match only. Returning the request's origin when it is NOT on the
+      // list would echo any caller back to itself and defeat the whole point.
+      return corsOrigins.includes(origin?.replace(/\/$/, '') ?? '') ? origin : null;
+    },
+  }),
+);
+
+/*
+ * Rate limits. These exist to stop accidental hammering and casual abuse —
+ * the solvency gate is what actually protects the money.
+ *
+ * Order creation is the expensive path: it makes three RPC calls (balance,
+ * sender lookup inside createTransfer, latest blockhash) plus a database
+ * insert, so it is the one worth limiting tightly. Reads are cheaper but
+ * /api/status still costs two getBalance calls, so it is not free either.
+ */
+app.use('/api/*', rateLimit({ name: 'read', limit: 120, windowMs: 60_000 }));
+app.use('/api/orders', async (c, next) =>
+  c.req.method === 'POST'
+    ? rateLimit({ name: 'order', limit: 10, windowMs: 10 * 60_000 })(c, next)
+    : next(),
+);
 
 /* ------------------------------------------------------------------ status */
 

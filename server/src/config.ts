@@ -62,8 +62,24 @@ export const config = {
   /** How long a quoted price is honoured before the order must be re-quoted. */
   quoteTtlSeconds: Number(opt('QUOTE_TTL_SECONDS', '60')),
 
+  /**
+   * Comma-separated list of allowed origins, or '*'.
+   *
+   * '*' is fine for a read-only API but this one creates orders, so a
+   * malicious page on any domain could quote against it in a visitor's
+   * browser. Locked to the site's own origins in production.
+   */
   corsOrigin: opt('CORS_ORIGIN', '*'),
 } as const;
+
+/** Parsed allow-list. '*' stays a wildcard; anything else becomes exact matches. */
+export const corsOrigins: string[] | '*' =
+  config.corsOrigin.trim() === '*'
+    ? '*'
+    : config.corsOrigin
+        .split(',')
+        .map((s) => s.trim().replace(/\/$/, ''))
+        .filter(Boolean);
 
 export const chipsEnabled = config.chipsMint.length > 0;
 
