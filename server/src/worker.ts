@@ -52,8 +52,34 @@ async function settlePending(): Promise<void> {
     }
 
     const service = await getService(order.service_id);
+    const estMinutes = service?.est_minutes ?? 30;
+
+    /*
+     * The deadline must account for the work already ahead of this order.
+     *
+     * A flat paid_at + est_minutes is only honest for an empty queue. With
+     * anything queued it commits to a time the agent cannot reach, and since
+     * refundOverdue enforces the deadline literally, every backed-up order
+     * refunds itself before it is ever worked — the agent paying out for a
+     * promise it was never given the chance to keep.
+     *
+     * This was live and would have fired on essentially every order: the tick
+     * ran every 900s while the shortest service promised 8 minutes, so an
+     * order paid just after a tick was already overdue by the time the agent
+     * first saw it.
+     */
+    const { count: ahead } = await db
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['paid', 'running']);
+
+    const queueAllowanceMs = (ahead ?? 0) * estMinutes * 60_000;
+    // One tick of slack, so an order is never overdue before the agent's first
+    // opportunity to look at it.
+    const noticeAllowanceMs = config.tickIntervalSeconds * 1000;
+
     const deadline = new Date(
-      result.paidAt.getTime() + (service?.est_minutes ?? 30) * 60_000,
+      result.paidAt.getTime() + estMinutes * 60_000 + queueAllowanceMs + noticeAllowanceMs,
     );
 
     // Guarded on status so a concurrent tick cannot credit the same order twice.
