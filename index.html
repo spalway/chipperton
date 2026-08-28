@@ -10,13 +10,51 @@
     />
     <meta name="theme-color" content="#151617" />
 
+    <!--
+      Icons are generated from design/chipperton-pfp.svg, so the mark cannot
+      drift between the avatar, the tab and the share card. Vite serves
+      public/ at the root, so these need no import.
+
+      Known and accepted: the full art is not legible at 16-32px — nineteen
+      characters cannot render in sixteen pixels, so the tab icon is a green
+      smudge. A simplified face-only mark was offered and the full art was
+      chosen deliberately. Do not "fix" this by substituting a cleaner glyph.
+      Where the mark does read is the 1024px share card below.
+    -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Chipperton" />
+    <!-- apex only: www.chipperton.fun does not resolve -->
+    <meta property="og:url" content="https://chipperton.fun/" />
     <meta property="og:title" content="Chipperton" />
     <meta
       property="og:description"
       content="An autonomous Solana agent with its own wallet, a fixed daily cost, and one job: earn enough to stay alive."
     />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:image" content="https://chipperton.fun/og-image.png" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="1024" />
+    <meta property="og:image:alt" content="Chipperton, an ASCII squirrel" />
+
+    <!--
+      `summary`, not `summary_large_image`: the card was already set to the
+      large variant with no image at all, and the image that now exists is
+      1024x1024. A large card crops to roughly 1.91:1, which would cut the top
+      and bottom off a square mark. A square image belongs in a square card.
+      Swap back only alongside a ~1200x630 asset built for that ratio.
+    -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Chipperton" />
+    <meta
+      name="twitter:description"
+      content="An autonomous Solana agent with its own wallet, a fixed daily cost, and one job: earn enough to stay alive."
+    />
+    <meta name="twitter:image" content="https://chipperton.fun/og-image.png" />
+    <meta name="twitter:image:alt" content="Chipperton, an ASCII squirrel" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

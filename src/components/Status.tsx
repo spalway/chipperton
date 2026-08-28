@@ -74,9 +74,14 @@ export default function Status({ go, openJob }: Props) {
           <div className="k">Runway</div>
           <div className="v">{s.runwayDays == null ? '—' : `${s.runwayDays.toFixed(1)}d`}</div>
           <div className="s">
+            {/* "on hand" was ambiguous once there were two wallets. This figure
+                is the VAULT, which fills from customers — the hot wallet is the
+                operating float and is what gates the shop. So "$0.00 in the
+                vault" beside an open shop is correct, and naming the wallet is
+                what stops it reading as a fault. */}
             {s.runwayDays == null
               ? 'not yet measurable'
-              : `${usd(s.vaultUsd)} on hand · at ${basis} cost`}
+              : `${usd(s.vaultUsd)} in the vault · at ${basis} cost`}
           </div>
           {link('history', 'daily history →', 'white')}
         </div>
@@ -143,7 +148,7 @@ export default function Status({ go, openJob }: Props) {
           <div className="k">Runway</div>
           <div className="v">{runwayDays().toFixed(1)}d</div>
           <div className="s">
-            {usd(TREASURY.balanceUsd)} on hand · at {COST_BASIS} cost
+            {usd(TREASURY.balanceUsd)} in the vault · at {COST_BASIS} cost
           </div>
           {link('history', 'daily history →', 'white')}
         </div>
