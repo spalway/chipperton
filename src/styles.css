@@ -238,6 +238,13 @@
   .buy{font-family:var(--sans);font-size:11px;font-weight:600;color:var(--green-ink);background:var(--green);
     border:none;border-radius:2px;padding:5px 12px;cursor:pointer;transition:filter .12s}
   .buy:hover{filter:brightness(1.08)}
+  /* deferred services — driven by `active` from /api/services, never hardcoded */
+  .item.soon{opacity:.5}
+  .item.soon .n,.svc.soon .n{color:var(--muted)}
+  .svc.soon{opacity:.5;cursor:default}
+  .svc.soon:hover .n{color:var(--muted)}
+  .soonchip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);border:1px solid var(--line-2);padding:4px 10px}
   .opt{display:flex;justify-content:space-between;align-items:center;gap:10px;
     border:1px solid var(--line);padding:8px 10px;cursor:pointer;transition:.12s;background:var(--card)}
   .opt:hover{border-color:var(--line-2)}

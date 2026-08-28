@@ -1,5 +1,6 @@
 import { address } from '@solana/kit';
 import { rpcData } from '../chain/clients.ts';
+import { rpcCall } from '../chain/throttle.ts';
 
 const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_2022_PROGRAM = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
@@ -28,9 +29,9 @@ export interface SafetyFacts {
 export async function gatherSafetyFacts(mintStr: string): Promise<SafetyFacts> {
   const mint = address(mintStr);
 
-  const account = await rpcData
-    .getAccountInfo(mint, { encoding: 'jsonParsed', commitment: 'confirmed' })
-    .send();
+  const account = await rpcCall(() =>
+    rpcData.getAccountInfo(mint, { encoding: 'jsonParsed', commitment: 'confirmed' }).send(),
+  );
 
   if (!account.value) throw new Error(`mint account not found on mainnet: ${mintStr}`);
 
@@ -52,7 +53,7 @@ export async function gatherSafetyFacts(mintStr: string): Promise<SafetyFacts> {
   const mintAuthority = (info.mintAuthority as string | null) ?? null;
   const freezeAuthority = (info.freezeAuthority as string | null) ?? null;
 
-  const largest = await rpcData.getTokenLargestAccounts(mint).send();
+  const largest = await rpcCall(() => rpcData.getTokenLargestAccounts(mint).send());
   const topHolders = (largest.value ?? []).slice(0, 10).map((a) => {
     const ui = Number(a.uiAmountString ?? '0');
     return {

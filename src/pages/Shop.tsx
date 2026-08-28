@@ -71,20 +71,24 @@ export default function Shop() {
         </div>
         <div className="shop">
           {SERVICES.map((s) => (
-            <div className="item" key={s.id}>
+            <div className={`item${s.active ? '' : ' soon'}`} key={s.id}>
               <div className="top">
                 <span className="n">{s.name}</span>
                 <span className="pz">
                   ${s.price}
-                  <s>{chipsPrice(s.price)} in chips</s>
+                  {s.active && <s>{chipsPrice(s.price)} in chips</s>}
                 </span>
               </div>
               <div className="d">{s.long}</div>
               <div className="foot">
-                <span className="tt">{s.turnaround}</span>
-                <button className="buy" type="button">
-                  Buy
-                </button>
+                <span className="tt">{s.active ? s.turnaround : 'not yet available'}</span>
+                {s.active ? (
+                  <button className="buy" type="button">
+                    Buy
+                  </button>
+                ) : (
+                  <span className="soonchip">soon</span>
+                )}
               </div>
             </div>
           ))}

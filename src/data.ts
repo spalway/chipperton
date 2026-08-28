@@ -121,6 +121,12 @@ export type Service = {
   long: string
   price: number
   turnaround: string
+  /**
+   * Mirrors `active` from GET /api/services. Drives whether a service is
+   * orderable or shows as "soon" — so deferring or shipping one is a data
+   * change, never a frontend edit.
+   */
+  active: boolean
 }
 
 /** price × 0.9, formatted — the $CHIPS discount is derived, never hand-typed. */
@@ -135,6 +141,7 @@ export const SERVICES: Service[] = [
     long: 'Mint and freeze authority, LP status and lock, holder concentration, top-10 supply share, and whether the deployer still holds.',
     price: 6,
     turnaround: '~8 min',
+    active: true,
   },
   {
     id: 'trace',
@@ -143,6 +150,7 @@ export const SERVICES: Service[] = [
     long: 'Follows funds from a starting signature up to six hops, flagging exchange deposits, known mixers, and wallets that recombine.',
     price: 9,
     turnaround: '~20 min',
+    active: true,
   },
   {
     id: 'wallet',
@@ -151,6 +159,7 @@ export const SERVICES: Service[] = [
     long: '90 days of an address: counterparties, inflow and outflow, programs it touches most, and the pattern of when it acts.',
     price: 4,
     turnaround: '~12 min',
+    active: true,
   },
   {
     id: 'bundle',
@@ -159,6 +168,7 @@ export const SERVICES: Service[] = [
     long: 'Finds wallets funded from a common source in the minutes around a launch, and estimates how much of supply they took.',
     price: 12,
     turnaround: '~25 min',
+    active: true,
   },
   {
     id: 'idl',
@@ -167,6 +177,7 @@ export const SERVICES: Service[] = [
     long: "Reads a program's IDL and explains in plain English what each instruction does, what it can touch, and which accounts hold authority.",
     price: 8,
     turnaround: '~18 min',
+    active: true,
   },
   {
     id: 'watchlist',
@@ -175,6 +186,7 @@ export const SERVICES: Service[] = [
     long: 'Watches up to 25 addresses and reports movements once a day — new positions, exits, and transfers above a threshold you set.',
     price: 15,
     turnaround: 'per week',
+    active: true,
   },
 ]
 

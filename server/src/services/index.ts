@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config.ts';
 import { gatherSafetyFacts, renderSafetyFacts } from './safety.ts';
+import { gatherWalletFacts, renderWalletFacts } from './wallet.ts';
 
 const anthropic = new Anthropic({
   apiKey: config.anthropicApiKey,
@@ -30,6 +31,17 @@ export async function runJob(serviceId: string, input: string): Promise<string> 
         block,
       );
       return `${block}\n\n## Verdict\n\n${verdict}\n`;
+    }
+
+    case 'wallet': {
+      const facts = await gatherWalletFacts(input);
+      const block = renderWalletFacts(facts);
+      const verdict = await writeVerdict(
+        'You are describing how a Solana address behaves, for someone deciding ' +
+          'whether to trust or transact with it.',
+        block,
+      );
+      return `${block}\n\n## Read\n\n${verdict}\n`;
     }
 
     default:

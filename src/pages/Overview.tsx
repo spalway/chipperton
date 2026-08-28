@@ -112,14 +112,18 @@ export default function Overview({ go, openJob }: Props) {
         </div>
         <div className="svcgrid">
           {SERVICES.map((s) => (
-            <div className="svc" key={s.id} onClick={() => go('shop')}>
+            <div
+              className={`svc${s.active ? '' : ' soon'}`}
+              key={s.id}
+              onClick={() => go('shop')}
+            >
               <div>
                 <div className="n">{s.name}</div>
                 <div className="d">{s.short}</div>
               </div>
               <div className="r">
                 <div className="pz">${s.price}</div>
-                <div className="tt">{s.turnaround}</div>
+                <div className="tt">{s.active ? s.turnaround : 'soon'}</div>
               </div>
             </div>
           ))}
