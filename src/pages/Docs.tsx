@@ -111,6 +111,13 @@ export default function Docs({ go }: { go: (v: View) => void }) {
             <b>Refunds</b> — if a job misses the deadline fixed when you paid, Chipperton refunds
             you, and the refund is a transaction you can open.
           </li>
+          <li>
+            <b>It only sells what it could refund</b> — before taking an order it checks that the
+            refund wallet covers that job <i>plus everything already owed</i>, and refuses the
+            sale if it does not. This one is enforced at the point of payment, not just by the
+            worker afterwards: an agent that cannot honour its promises stops selling rather
+            than stopping halfway through a job someone paid for.
+          </li>
         </ul>
 
         <h4 id="d-shut">Shutdown</h4>

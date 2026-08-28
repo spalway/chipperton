@@ -60,6 +60,15 @@ export default function Shop() {
           and you get a refund if it misses its own estimate.{' '}
           <b>Pay in $CHIPS and every price drops {discountPct}%.</b>
         </p>
+        {/* Verified against server/src/routes.ts:462 and worker.ts:164 — both
+            sum EVERY outstanding paid/running order, add a fee buffer, and
+            refuse below it. Stronger than "we refund you", and checkable. */}
+        <p>
+          <b>It only sells what it could refund.</b> Before accepting an order Chipperton checks
+          that its refund wallet covers that job <em>and</em> everything it already owes. If it
+          does not, the sale is refused rather than taken — so the shop closing is the promise
+          working, not failing.
+        </p>
       </div>
 
       {/* Not the "can honour refunds / so it is accepting new work" reassurance
