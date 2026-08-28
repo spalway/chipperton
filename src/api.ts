@@ -11,8 +11,18 @@ export const hasApi = () => API_BASE.length > 0
 
 export type CostBasisField = 'declared' | 'measured'
 
+/**
+ * Verified against the live endpoint on 2026-08-28, not against the written
+ * contract — the contract has been wrong twice.
+ *
+ * `null` and `0` mean different things here and must render differently:
+ *   0    → measured, and it is genuinely zero
+ *   null → not yet measurable (nothing to compute from)
+ * Neither is missing data, and neither may fall back to a sample constant.
+ */
 export type StatusResponse = {
-  vaultLamports?: number
+  vaultAddress: string
+  vaultLamports: number
   /** COUNTED on-chain. Authoritative — never derive this from a ledger. */
   vaultUsd: number
   /** Declared config constant. An assumption. */
@@ -28,7 +38,10 @@ export type StatusResponse = {
   /** Scheduled, not guaranteed — the worker is best-effort cron. */
   nextTickAt: string | null
   medianTurnaroundMinutes: number | null
-  deliveredToday: number
+  /** Cluster payments settle on. Research jobs read mainnet regardless. */
+  payCluster: string
+  /** false while $CHIPS has no mint — the discount path cannot function. */
+  chipsEnabled: boolean
 }
 
 export type ServiceResponse = {
@@ -37,6 +50,8 @@ export type ServiceResponse = {
   short: string
   long: string
   priceLamports: number
+  priceSol: number
+  /** Floats off the live SOL price — moves between requests. Do not cache. */
   priceUsd: number
   estMinutes: number
   /** false → render as "soon", not orderable. */

@@ -1,5 +1,6 @@
 import { config } from './config.ts';
 import { db, type Order } from './db.ts';
+import { agentSigner, rpcPay } from './chain/clients.ts';
 import { sendRefund, writeReceipt } from './chain/receipt.ts';
 import { settleOrder } from './chain/settle.ts';
 import { runJob } from './services/index.ts';
@@ -116,8 +117,39 @@ async function refundOverdue(): Promise<void> {
   }
 }
 
+/**
+ * Refund liability the hot wallet must be able to cover right now.
+ *
+ * Payments land in the vault but refunds are paid from the hot wallet, so the
+ * hot wallet drains as the vault fills. Left alone it eventually cannot refund
+ * — and it would discover that only at the moment it owed someone money.
+ * An agent that cannot refund must not accept new work.
+ */
+async function canCoverRefunds(): Promise<boolean> {
+  const { data } = await db
+    .from('orders')
+    .select('amount_lamports')
+    .in('status', ['paid', 'running']);
+
+  const owed = (data ?? []).reduce((sum, o) => sum + Number(o.amount_lamports), 0);
+  const feeBuffer = 10_000_000; // ~0.01 SOL for signatures
+  const { value: balance } = await rpcPay.getBalance(agentSigner.address).send();
+
+  if (Number(balance) >= owed + feeBuffer) return true;
+
+  log(
+    `HOT WALLET LOW — balance ${Number(balance) / 1e9} SOL cannot cover ` +
+      `${owed / 1e9} SOL of outstanding refunds. Refusing new work. ` +
+      `Top up ${agentSigner.address} from the vault.`,
+  );
+  return false;
+}
+
 /** Claim and run the oldest paid job. Queue order, not who paid most. */
 async function workOne(): Promise<void> {
+  // Checked before claiming, not after failing.
+  if (!(await canCoverRefunds())) return;
+
   const { data } = await db
     .from('orders')
     .select('*')

@@ -31,21 +31,35 @@ export const heatColor = (left: number) => {
   return mix(ORANGE, RED, (t - 0.75) / 0.25)
 }
 
-/** Time until the next `every`-minute boundary, ticking live. */
-export function useCountdown(every = 15) {
+/**
+ * Time until the next review.
+ *
+ * When `targetIso` is supplied it counts down to the server's real `nextTickAt`.
+ * Without it, it falls back to the next wall-clock boundary — which is a guess,
+ * so the caption that accompanies it says "scheduled" either way.
+ */
+export function useCountdown(every = 15, targetIso: string | null = null) {
   const read = () => {
-    const n = new Date()
-    const seconds = (every - (n.getMinutes() % every)) * 60 - n.getSeconds()
-    return { seconds, label: fmt(seconds), left: seconds / (every * 60) }
+    const window = every * 60
+    let seconds: number
+    if (targetIso) {
+      const d = Math.round((Date.parse(targetIso) - Date.now()) / 1000)
+      seconds = Number.isFinite(d) ? Math.max(0, d) : 0
+    } else {
+      const n = new Date()
+      seconds = (every - (n.getMinutes() % every)) * 60 - n.getSeconds()
+    }
+    return { seconds, label: fmt(seconds), left: Math.min(1, seconds / window) }
   }
 
   const [state, setState] = useState(read)
 
   useEffect(() => {
+    setState(read())
     const id = setInterval(() => setState(read()), 1000)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [every])
+  }, [every, targetIso])
 
   return { ...state, color: heatColor(state.left) }
 }

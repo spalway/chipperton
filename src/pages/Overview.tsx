@@ -1,16 +1,7 @@
-import {
-  AGENT,
-  DECISIONS,
-  JOBS,
-  SERVICES,
-  deliveredToday,
-  measuredTurnaroundMins,
-  openJobs,
-  usd,
-  type View,
-} from '../data'
+import { AGENT, DECISIONS, measuredTurnaroundMins, usd, type View } from '../data'
 import Motto from '../components/Motto'
 import Status from '../components/Status'
+import { useResolved } from '../useLiveData'
 
 const LINKS: { view: View; label: string; promo: string; green?: boolean }[] = [
   { view: 'shop', label: "chip's shop →", promo: '10% off if you pay with chips', green: true },
@@ -22,8 +13,9 @@ type Props = { go: (v: View) => void; openJob: (id: string | null) => void }
 
 export default function Overview({ go, openJob }: Props) {
   // every figure below is derived from the day ledger / JOBS — nothing hand-typed
-  const open = openJobs()
-  const turnaround = measuredTurnaroundMins()
+  const { services, queue, isLive, emptyQueue } = useResolved()
+  const open = queue.filter((j) => j.status !== 'delivered')
+  const turnaround = isLive ? null : measuredTurnaroundMins()
 
   const nav = (v: View) => (e: React.MouseEvent) => {
     e.preventDefault()
@@ -103,7 +95,7 @@ export default function Overview({ go, openJob }: Props) {
         <div className="shead">
           <h2>
             <i className="dot" />
-            services<span className="n">{SERVICES.length}</span>
+            services<span className="n">{services.length}</span>
           </h2>
           <span className="meta">
             <a className="shoplink" href="#" onClick={nav('shop')}>
@@ -112,7 +104,7 @@ export default function Overview({ go, openJob }: Props) {
           </span>
         </div>
         <div className="svcgrid">
-          {SERVICES.map((s) => (
+          {services.map((s) => (
             <div
               className={`svc${s.active ? '' : ' soon'}`}
               key={s.id}
@@ -152,10 +144,15 @@ export default function Overview({ go, openJob }: Props) {
             queue<span className="n">{open.length}</span>
           </h2>
           <span className="meta">
-            {deliveredToday()} delivered today
+            {queue.filter((j) => j.status === 'delivered').length} delivered
             {turnaround ? ` · ${turnaround} min median turnaround, measured` : ''}
           </span>
         </div>
+        {emptyQueue ? (
+          <p className="emptyq">
+            No orders yet. The queue is genuinely empty — this is live data, not a placeholder.
+          </p>
+        ) : (
         <table className="qt">
           <thead>
             <tr>
@@ -167,7 +164,7 @@ export default function Overview({ go, openJob }: Props) {
             </tr>
           </thead>
           <tbody>
-            {JOBS.map((j) => (
+            {queue.map((j) => (
               <tr key={j.id} onClick={() => { openJob(j.id); go('jobs') }}>
                 <td className="id">{j.id}</td>
                 <td className="nm">{j.service}</td>
@@ -186,6 +183,7 @@ export default function Overview({ go, openJob }: Props) {
             ))}
           </tbody>
         </table>
+        )}
       </section>
     </div>
   )

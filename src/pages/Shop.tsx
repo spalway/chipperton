@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { chipsPrice, measuredTurnaroundMins, openJobs, SERVICES } from '../data'
+import { chipsPrice, measuredTurnaroundMins, openJobs } from '../data'
+import { useResolved } from '../useLiveData'
 import Motto from '../components/Motto'
 
 const STEPS = [
@@ -18,7 +19,15 @@ const STEPS = [
 ]
 
 export default function Shop() {
+  const { services, isLive, status, queue } = useResolved()
+  // The server reports whether $CHIPS can actually be paid with. It is false
+  // while the token has no mint — pump.fun is mainnet-only and payments settle
+  // on devnet — so offering it would be a button that cannot work.
+  const chipsEnabled = status ? status.chipsEnabled : true
   const [payWith, setPayWith] = useState<'chips' | 'sol'>('chips')
+  const pay = chipsEnabled ? payWith : 'sol'
+  const backlog = status ? status.backlog : queue.filter((j) => j.status !== 'delivered').length
+  const turnaround = isLive ? status?.medianTurnaroundMinutes ?? null : measuredTurnaroundMins()
 
   return (
     <div>
@@ -65,17 +74,15 @@ export default function Shop() {
         <div className="shead">
           <h2>
             <i className="dot" />
-            services<span className="n">{SERVICES.length}</span>
+            services<span className="n">{services.length}</span>
           </h2>
           <span className="meta">
-            backlog {openJobs().length} job{openJobs().length === 1 ? '' : 's'}
-            {measuredTurnaroundMins()
-              ? ` · ${measuredTurnaroundMins()} min median turnaround, measured`
-              : ''}
+            backlog {backlog} job{backlog === 1 ? '' : 's'}
+            {turnaround ? ` · ${turnaround} min median turnaround, measured` : ''}
           </span>
         </div>
         <div className="shop">
-          {SERVICES.map((s) => (
+          {services.map((s) => (
             <div className={`item${s.active ? '' : ' soon'}`} key={s.id}>
               <div className="top">
                 <span className="n">{s.name}</span>

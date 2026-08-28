@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getQueue, getServices, getStatus, hasApi, type QueueResponse, type ServiceResponse, type StatusResponse } from './api'
+import { adaptQueueRow, adaptService } from './adapt'
+import { JOBS, SERVICES } from './data'
 
 /**
  * Where the numbers on screen came from.
@@ -29,6 +31,25 @@ const IDLE: LiveData = {
   services: null,
   queue: null,
   loading: false,
+}
+
+/**
+ * Live services/queue when the API answered, sample constants otherwise —
+ * and a flag saying which, so callers can disclose it. Never mixed.
+ */
+export function useResolved() {
+  const live = useLiveData()
+  const isLive = live.source === 'live'
+  return {
+    isLive,
+    source: live.source,
+    error: live.error,
+    status: live.status,
+    services: isLive && live.services ? live.services.map(adaptService) : SERVICES,
+    queue: isLive && live.queue ? live.queue.map(adaptQueueRow) : JOBS,
+    /** true when the API answered and genuinely has no rows */
+    emptyQueue: isLive && (live.queue?.length ?? 0) === 0,
+  }
 }
 
 export function useLiveData(): LiveData {
