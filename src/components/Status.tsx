@@ -5,6 +5,7 @@ import {
   openJobs,
   pendingEtaMins,
   runwayDays,
+  turnaroundLabel,
   usd,
   type View,
 } from '../data'
@@ -51,30 +52,8 @@ export default function Status({ go, openJob }: Props) {
   // ── live ────────────────────────────────────────────────────────────────
   if (s) {
     const basis = s.dailyCostBasis
-    const sol = (l: number) => `${(l / 1e9).toFixed(4)} SOL`
     return (
-      <>
-        {/* Solvency is a better liveness signal than tick timing: refunds are paid
-            from the hot wallet while payments fill the vault, so it can degrade
-            silently and only discover it when it owes someone money. The flag uses
-            the same buffer the worker gates on, so page and agent cannot disagree. */}
-        <div className={`solv ${s.canHonourRefunds ? 'ok' : 'bad'}`}>
-          <span className="dot2" />
-          {s.canHonourRefunds ? (
-            <>
-              <b>Can honour refunds.</b> {sol(s.hotWalletLamports)} in the refund wallet against{' '}
-              {sol(s.refundLiabilityLamports)} outstanding — so it is accepting new work.
-            </>
-          ) : (
-            <>
-              <b>Cannot cover outstanding refunds.</b> {sol(s.hotWalletLamports)} against{' '}
-              {sol(s.refundLiabilityLamports)} owed — it has stopped accepting new work.
-              Settlements and refunds already in flight continue.
-            </>
-          )}
-        </div>
-
-        <div className="statrow">
+      <div className="statrow">
         <div className="sm white">
           <div className="k">Runway</div>
           <div className="v">{s.runwayDays == null ? '—' : `${s.runwayDays.toFixed(1)}d`}</div>
@@ -83,7 +62,7 @@ export default function Status({ go, openJob }: Props) {
               ? 'not yet measurable'
               : `${usd(s.vaultUsd)} on hand · at ${basis} cost`}
           </div>
-          {link('history', 'view historical daily activities →', 'white')}
+          {link('history', 'daily history →', 'white')}
         </div>
 
         <div className="sm green">
@@ -92,7 +71,7 @@ export default function Status({ go, openJob }: Props) {
           <div className="s">{basis} · compute + inference</div>
           {link(
             'costs',
-            basis === 'measured' ? 'view cost receipt →' : 'view cost breakdown →',
+            basis === 'measured' ? 'cost receipt →' : 'cost breakdown →',
             'green',
           )}
         </div>
@@ -105,9 +84,9 @@ export default function Status({ go, openJob }: Props) {
           <div className="s">
             {s.medianTurnaroundMinutes == null
               ? 'nothing delivered yet'
-              : `${s.medianTurnaroundMinutes} min median turnaround, measured`}
+              : `${turnaroundLabel(s.medianTurnaroundMinutes)} median turnaround, measured`}
           </div>
-          {link('jobs', 'view the queue →', 'blue', () => openJob?.(null))}
+          {link('jobs', 'the queue →', 'blue', () => openJob?.(null))}
         </div>
 
         <div className="sm red">
@@ -117,10 +96,9 @@ export default function Status({ go, openJob }: Props) {
             scheduled{nextIn != null ? ` · in ~${Math.max(nextIn, 0)} min` : ''} · every{' '}
             {Math.round(s.tickIntervalSeconds / 60)} min
           </div>
-          {link('decisions', 'view decision history →', 'red')}
+          {link('decisions', 'decisions →', 'red')}
         </div>
-        </div>
-      </>
+      </div>
     )
   }
 
@@ -150,14 +128,14 @@ export default function Status({ go, openJob }: Props) {
           <div className="s">
             {usd(TREASURY.balanceUsd)} on hand · at {COST_BASIS} cost
           </div>
-          {link('history', 'view historical daily activities →', 'white')}
+          {link('history', 'daily history →', 'white')}
         </div>
 
         <div className="sm green">
           <div className="k">Daily cost</div>
           <div className="v">{usd(TREASURY.dailyCostUsd)}</div>
           <div className="s">{COST_BASIS} · compute + inference</div>
-          {link('costs', 'view cost breakdown →', 'green')}
+          {link('costs', 'cost breakdown →', 'green')}
         </div>
 
         <div className="sm blue">
@@ -166,14 +144,14 @@ export default function Status({ go, openJob }: Props) {
             {openJobs().length} job{openJobs().length === 1 ? '' : 's'}
           </div>
           <div className="s">{pendingEta ? `~${pendingEta} min est. wait` : 'queue empty'}</div>
-          {link('jobs', 'view the queue →', 'blue', () => openJob?.(null))}
+          {link('jobs', 'the queue →', 'blue', () => openJob?.(null))}
         </div>
 
         <div className="sm red">
           <div className="k">Next decision</div>
           <div className="v">{tick.label}</div>
           <div className="s">scheduled · every ~{AGENT.reviewMinutes} min</div>
-          {link('decisions', 'view decision history →', 'red')}
+          {link('decisions', 'decisions →', 'red')}
         </div>
       </div>
     </>

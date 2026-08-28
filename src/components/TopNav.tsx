@@ -1,4 +1,5 @@
 import { NAV, type View } from '../data'
+import ConnectWallet from './ConnectWallet'
 
 type Props = {
   view: View
@@ -28,9 +29,7 @@ export default function TopNav({ view, go }: Props) {
             </a>
           ))}
         </div>
-        <button className="connect" type="button">
-          Connect Wallet
-        </button>
+        <ConnectWallet />
       </div>
     </nav>
   )

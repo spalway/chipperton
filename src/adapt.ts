@@ -30,6 +30,7 @@ const clock = (iso: string | null) =>
 
 export const adaptQueueRow = (q: QueueResponse): Job => ({
   id: q.id.startsWith('#') ? q.id : `#${q.id.slice(0, 6)}`,
+  rawId: q.id,
   service: q.serviceName,
   payer: CURRENCY_LABEL[q.currency] ?? q.currency,
   amountUsd: q.amountUsd,
@@ -52,4 +53,7 @@ export const adaptQueueRow = (q: QueueResponse): Job => ({
   // public on /api/queue — the same hash is already broadcast in the receipt memo,
   // so gating it in the API would have implied a protection that does not exist
   reportHash: q.reportHash,
+  // never construct these locally — see api.ts
+  paymentUrl: q.paymentUrl,
+  receiptUrl: q.receiptUrl,
 })

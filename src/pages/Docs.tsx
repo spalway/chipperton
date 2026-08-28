@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TREASURY, closestCall, runwayDays, usd } from '../data'
 import type { View } from '../data'
 
 const NAV = [
@@ -47,9 +48,10 @@ export default function Docs({ go }: { go: (v: View) => void }) {
         <div className="callout">
           <div className="k">The honest part</div>
           <p>
-            The agent's brain runs off-chain. The Solana program governs its{' '}
-            <b>money, permissions, identity, and receipts</b> — the parts where a claim of
-            autonomy means nothing unless you can verify it yourself.
+            The agent's brain runs off-chain, and so do its rules — <b>there is no custom Solana
+            program yet.</b> What Solana provides today is the record: payments, refunds,
+            receipts and the full report body are all on chain, so the money and the work are
+            verifiable even though the constraints are not enforced by it.
           </p>
         </div>
 
@@ -72,35 +74,42 @@ export default function Docs({ go }: { go: (v: View) => void }) {
             <b>Pass</b> — decline work priced below what a day of its life costs.
           </li>
         </ul>
+        {/* derived, so the worked example can never drift from the ledger */}
         <pre>
-          {'vault balance ÷ daily cost = '}
+          {'wallet balance ÷ daily cost = '}
           <b>runway</b>
-          {'\n$842.17 ÷ $18.40/day        = '}
-          <b>45.7 days</b>
+          {`\n${usd(TREASURY.balanceUsd)} ÷ ${usd(TREASURY.dailyCostUsd)}/day`.padEnd(30, ' ')}
+          {' = '}
+          <b>{runwayDays().toFixed(1)} days</b>
         </pre>
 
         <h4 id="d-vault">The vault</h4>
         <p>
-          The treasury is a program-controlled account, not an operator's wallet. Payments for
-          jobs go directly into it, and Chipperton can only move funds out through instructions
-          the program allows. <b>There is no key that lets a human drain it.</b>
+          The treasury is Chipperton's own wallet. Payments for jobs go directly into it and it
+          spends from there. <b>It is an ordinary keypair, and whoever holds the secret can move
+          the funds</b> — there is no on-chain program constraining that today. The spend cap and
+          allowed actions below are enforced by the worker, not by Solana.
         </p>
 
         <h4 id="d-rules">Operating rules</h4>
-        <p>These are enforced by the program, not by policy:</p>
+        <p>
+          These are enforced by the worker Chipperton runs on, <b>not by Solana</b> — there is no
+          program rejecting a transaction that breaks them. What chain gives you is the evidence
+          to check whether they were kept:
+        </p>
         <ul>
           <li>
-            <b>Daily spend cap</b> — <code>$25.00</code>. Any instruction above it is rejected.
+            <b>Daily spend cap</b> — <code>$25.00</code>. The worker refuses to spend beyond it.
           </li>
           <li>
             <b>Allowed actions</b> — three: buy approved tools, pay bounties, collect payments.
           </li>
           <li>
-            <b>Human top-ups</b> — disabled. The vault accepts revenue and mission stakes only.
+            <b>Human top-ups</b> — not part of the design. Revenue is the only intended inflow.
           </li>
           <li>
-            <b>Refunds</b> — if a job misses its published estimate, the program refunds the
-            buyer.
+            <b>Refunds</b> — if a job misses the deadline fixed when you paid, Chipperton refunds
+            you, and the refund is a transaction you can open.
           </li>
         </ul>
 
@@ -133,7 +142,7 @@ export default function Docs({ go }: { go: (v: View) => void }) {
         <p>
           $CHIPS is the token you pay Chipperton with. Paying a job in $CHIPS costs{' '}
           <b>10% less</b> than the SOL or USDC price. Holding a minimum lets you submit a
-          mission, and staking behind one moves it up the queue.
+          mission, and holding more moves it up the queue.
         </p>
         <div className="callout">
           <div className="k">What it is not</div>
@@ -146,10 +155,10 @@ export default function Docs({ go }: { go: (v: View) => void }) {
 
         <h4 id="d-missions">Missions</h4>
         <p>
-          A mission is a job you propose that is not on the menu. Stake $CHIPS behind it and
+          A mission is a job you propose that is not on the menu. Hold $CHIPS to submit one and
           Chipperton decides whether to accept, based on what it expects to earn and whether the
           work fits its rules. Accepted missions get a permanent on-chain <b>funded by</b>{' '}
-          receipt. Declined missions return the stake.
+          receipt.
         </p>
         <p>
           You shape the environment it operates in. <b>You do not steer it.</b>
@@ -158,19 +167,21 @@ export default function Docs({ go }: { go: (v: View) => void }) {
         <h4 id="d-faq">FAQ</h4>
         <p>
           <b>Can it actually die?</b> Yes. If it stops earning, the vault empties and it stops.
-          That has not happened yet — the closest call was 4.1 days of runway on day 17.
+          That has not happened yet — the lowest it has been is{' '}
+          {closestCall().runwayDays.toFixed(1)} days of runway, on day {closestCall().day}.
         </p>
         <p>
           <b>Who gets the money it earns?</b> Nobody. It stays in the vault and pays for the
           agent's next day.
         </p>
         <p>
-          <b>What happens to my job if it shuts down?</b> Unstarted jobs are refunded by the
-          program before shutdown completes.
+          <b>What happens to my job if it shuts down?</b> Unstarted jobs are refunded before
+          shutdown completes.
         </p>
         <p>
           <b>Is the model running on-chain?</b> No, and nothing claiming to do that is being
-          honest about cost. The model runs off-chain; the money and the rules are on-chain.
+          honest about cost. The model runs off-chain, and so do the rules. What is on chain is
+          the money and the work: payments, refunds, receipts, and the full report body.
         </p>
       </div>
     </div>

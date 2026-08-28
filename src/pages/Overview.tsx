@@ -1,7 +1,16 @@
-import { AGENT, DECISIONS, measuredTurnaroundMins, usd, type View } from '../data'
+import {
+  AGENT,
+  DECISIONS,
+  measuredTurnaroundMins,
+  runwayDays,
+  turnaroundLabel,
+  usd,
+  type View,
+} from '../data'
 import Motto from '../components/Motto'
 import Status from '../components/Status'
 import { useResolved } from '../useLiveData'
+import { short } from '../wallet'
 
 const LINKS: { view: View; label: string; promo: string; green?: boolean }[] = [
   { view: 'shop', label: "chip's shop →", promo: '10% off if you pay with chips', green: true },
@@ -19,6 +28,9 @@ export default function Overview({ go, openJob }: Props) {
   // paged, so a row count is "in this page" masquerading as "in total"
   const open = status ? status.backlog : queue.filter((j) => j.status !== 'delivered').length
   const turnaround = isLive ? null : measuredTurnaroundMins()
+  // live figure when there is one; the sample ledger otherwise. Never a literal.
+  const runway = isLive ? status?.runwayDays ?? null : runwayDays()
+  const reviewMins = status ? Math.round(status.tickIntervalSeconds / 60) : AGENT.reviewMinutes
 
   const nav = (v: View) => (e: React.MouseEvent) => {
     e.preventDefault()
@@ -31,9 +43,23 @@ export default function Overview({ go, openJob }: Props) {
         <div>
           <div className="titlerow">
             <h1>{AGENT.name}</h1>
-            <a className="registry" href="#">
-              agent registry →
-            </a>
+            {/* Was an "agent registry →" link with a dead href, promising a
+                registry entry that was never created. The wallet is the thing
+                that actually exists and can be checked, so it is what we link. */}
+            {/* Nothing at all when there is no live status: in sample mode we do
+                not have the agent's real address, and a placeholder one would be
+                the same lie in a different font. */}
+            {status?.vaultUrl && status.vaultAddress && (
+              <a
+                className="registry"
+                href={status.vaultUrl}
+                target="_blank"
+                rel="noreferrer"
+                title={status.vaultAddress}
+              >
+                {short(status.vaultAddress, 4, 4)} ↗
+              </a>
+            )}
           </div>
 
           <Motto />
@@ -42,8 +68,7 @@ export default function Overview({ go, openJob }: Props) {
             <p>
               Chipperton is an autonomous agent with its own wallet. It sells small Solana
               research jobs — token safety checks, wallet reports, transaction traces — and
-              everything it earns lands in a program-controlled vault that it spends from on
-              its own.
+              everything it earns lands in its own wallet, which it spends from on its own.
             </p>
             <p>
               It pays a fixed cost every day to keep running: compute, inference, RPC credits.{' '}
@@ -52,13 +77,24 @@ export default function Overview({ go, openJob }: Props) {
               The work it turns down moves nothing — those decisions are published with its
               reasoning, but there is no receipt to check.
             </p>
+            {/* This read "45.7 days" as a literal while the server reported 1.8.
+                A hardcoded headline is fine until the data behind it moves, and
+                then it is just a confident wrong number. */}
             <p>
-              It reviews its queue every fifteen minutes and decides what is worth doing. Right
-              now it has <span className="g">45.7 days</span> of runway left.
+              It reviews its queue every {reviewMins} minutes and decides what is worth doing.
+              {runway == null ? (
+                <> Its runway is not yet measurable.</>
+              ) : (
+                <>
+                  {' '}
+                  Right now it has <span className="g">{runway.toFixed(1)} days</span> of runway
+                  left.
+                </>
+              )}
             </p>
             <p>
               Pay for any job in <b>$CHIPS</b> and it costs 10% less than the SOL or USDC price.
-              Holding a minimum lets you submit a mission the agent may take; staking behind one
+              Holding a minimum lets you submit a mission the agent may take, and holding more
               moves it up the queue. It is not equity, ownership, or a revenue share.
             </p>
           </div>
@@ -77,9 +113,23 @@ export default function Overview({ go, openJob }: Props) {
 
         <div>
           <h1 className="agendatitle">agenda</h1>
+          {/* "+$29.60 net" was a literal here. The server does not report a
+              daily net, so rather than compute a lookalike we show what it does
+              report — how much work actually went out today. */}
           <p className="agendadate">
-            {AGENT.date} · day {AGENT.day} · +$29.60 net
+            {isLive ? (
+              <>
+                {new Date().toISOString().slice(0, 10)} · {deliveredToday} delivered today
+              </>
+            ) : (
+              <>
+                {AGENT.date} · day {AGENT.day} · +$29.60 net
+              </>
+            )}
           </p>
+
+          <Status go={go} openJob={openJob} />
+
           {DECISIONS.map((d, i) => (
             <div className="dec" key={i}>
               <div className="t">
@@ -126,20 +176,6 @@ export default function Overview({ go, openJob }: Props) {
         </div>
       </section>
 
-      {/* status sits under services on the landing page */}
-      <section>
-        <div className="shead">
-          <h2>
-            <i className="dot" />
-            status
-          </h2>
-          <span className="meta">
-            day {AGENT.day} · {AGENT.cluster} · {AGENT.status}
-          </span>
-        </div>
-        <Status go={go} openJob={openJob} />
-      </section>
-
       <section>
         <div className="shead">
           <h2>
@@ -148,7 +184,7 @@ export default function Overview({ go, openJob }: Props) {
           </h2>
           <span className="meta">
             {deliveredToday} delivered today
-            {turnaround ? ` · ${turnaround} min median turnaround, measured` : ''}
+            {turnaround ? ` · ${turnaroundLabel(turnaround)} median turnaround, measured` : ''}
             {queueTruncated ? ` · showing ${queueLimit} of ${queueTotal}` : ''}
           </span>
         </div>
@@ -176,14 +212,14 @@ export default function Overview({ go, openJob }: Props) {
                   {j.chips ? <b>{j.payer}</b> : j.payer} · {usd(j.amountUsd)}
                 </td>
                 <td
-                  className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : j.status === 'refunded' || j.status === 'expired' ? ' ref' : ''}`}
+                  className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : j.terminal ? ' ref' : ''}`}
                 >
                   {j.status}
                 </td>
                 <td className="eta">
                   {j.status === 'delivered'
                     ? j.deliveredAt
-                    : j.status === 'refunded' || j.status === 'expired'
+                    : !j.awaitingDelivery
                       ? 'repaid'
                       : j.etaMinutes != null
                         ? `${j.etaMinutes} min`

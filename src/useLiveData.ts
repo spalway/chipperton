@@ -1,30 +1,12 @@
-import { useEffect, useState } from 'react'
-import { getQueue, getServices, getStatus, hasApi, type QueuePage, type ServiceResponse, type StatusResponse } from './api'
+import { useCallback, useContext, useEffect, useState } from 'react'
+import { getQueue, getServices, getStatus, hasApi } from './api'
 import { adaptQueueRow, adaptService } from './adapt'
 import { JOBS, SERVICES } from './data'
+import { LiveContext, type LiveData } from './liveContext'
 
-/**
- * Where the numbers on screen came from.
- *
- * 'sample'  — no API configured; the page is showing illustrative constants.
- * 'live'    — fetched from the server.
- * 'error'   — an API is configured but unreachable; we fell back to constants.
- *
- * The UI MUST surface anything other than 'live'. Rendering sample constants
- * without saying so is the same failure as labelling a declared cost as measured.
- */
-export type DataSource = 'sample' | 'live' | 'error'
+export type { DataSource, LiveData } from './liveContext'
 
-export type LiveData = {
-  source: DataSource
-  error: string | null
-  status: StatusResponse | null
-  services: ServiceResponse[] | null
-  queue: QueuePage | null
-  loading: boolean
-}
-
-const IDLE: LiveData = {
+const IDLE: Omit<LiveData, 'refresh'> = {
   source: 'sample',
   error: null,
   status: null,
@@ -45,6 +27,7 @@ export function useResolved() {
     source: live.source,
     error: live.error,
     status: live.status,
+    refresh: live.refresh,
     services: isLive && live.services ? live.services.map(adaptService) : SERVICES,
     queue: isLive && live.queue ? live.queue.rows.map(adaptQueueRow) : JOBS,
     /**
@@ -69,13 +52,33 @@ export function useResolved() {
   }
 }
 
+/**
+ * The shared snapshot, from the provider when one is mounted.
+ *
+ * Without a provider this fetches for itself — the isolated-component case.
+ * Hooks must run unconditionally, so the fallback fetcher always runs and its
+ * result is simply discarded when the context wins.
+ */
 export function useLiveData(): LiveData {
-  const [data, setData] = useState<LiveData>(() =>
-    hasApi() ? { ...IDLE, loading: true } : IDLE,
+  const shared = useContext(LiveContext)
+  const own = useLiveFetch(shared == null)
+  return shared ?? own
+}
+
+/**
+ * The actual fetching. `enabled` is false in every consumer once a provider is
+ * mounted, so the request goes out exactly once per page rather than once per
+ * panel that happens to want a number.
+ */
+export function useLiveFetch(enabled = true): LiveData {
+  const [nonce, setNonce] = useState(0)
+  const refresh = useCallback(() => setNonce((n) => n + 1), [])
+  const [data, setData] = useState<Omit<LiveData, 'refresh'>>(() =>
+    enabled && hasApi() ? { ...IDLE, loading: true } : IDLE,
   )
 
   useEffect(() => {
-    if (!hasApi()) return
+    if (!enabled || !hasApi()) return
     const ac = new AbortController()
 
     Promise.all([getStatus(ac.signal), getServices(ac.signal), getQueue(ac.signal)])
@@ -92,7 +95,7 @@ export function useLiveData(): LiveData {
       })
 
     return () => ac.abort()
-  }, [])
+  }, [enabled, nonce])
 
-  return data
+  return { ...data, refresh }
 }

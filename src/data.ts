@@ -143,6 +143,17 @@ export const COST_LINES: CostLine[] = [
 
 export const costTotal = () => COST_LINES.reduce((a, c) => a + c.usd, 0)
 
+/**
+ * Turnaround comes off the wire as a raw float of minutes (0.4213666… for a
+ * 25-second job). Render it at human precision, and in seconds below a minute —
+ * "0 min" would read as instant and "0.42 min" reads as a machine leaking.
+ */
+export const turnaroundLabel = (mins: number) => {
+  if (mins < 1) return `${Math.round(mins * 60)} sec`
+  if (mins < 10) return `${mins.toFixed(1)} min`
+  return `${Math.round(mins)} min`
+}
+
 export const usd = (n: number) =>
   `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -164,6 +175,70 @@ export type Service = {
 /** price × 0.9, formatted — the $CHIPS discount is derived, never hand-typed. */
 export const chipsPrice = (usd: number) =>
   `$${(usd * (1 - CHIPS.discountPct / 100)).toFixed(2)}`
+
+/**
+ * What each service needs you to type, and what shape it has to be.
+ *
+ * `kind` is not decoration. An address decodes to 32 bytes and a transaction
+ * signature to 64, so one validator cannot cover both — asking for a signature
+ * and checking it like an address would reject every valid answer. The server
+ * has the final word; this exists so a typo is caught before a round trip
+ * rather than after one.
+ */
+export type InputSpec = {
+  label: string
+  placeholder: string
+  hint: string
+  kind: 'address' | 'signature'
+}
+
+export const INPUT_SPEC: Record<string, InputSpec> = {
+  safety: {
+    label: 'Token mint',
+    placeholder: 'Mint address',
+    hint: 'The mint address of the token to check.',
+    kind: 'address',
+  },
+  wallet: {
+    label: 'Wallet',
+    placeholder: 'Wallet address',
+    hint: 'The address to summarise. 90 days of activity.',
+    kind: 'address',
+  },
+  idl: {
+    label: 'Program',
+    placeholder: 'Program address',
+    hint: 'The program to read. It must publish an IDL.',
+    kind: 'address',
+  },
+  trace: {
+    label: 'Starting signature',
+    placeholder: 'Transaction signature',
+    hint: 'The transaction to follow funds from.',
+    kind: 'signature',
+  },
+  bundle: {
+    label: 'Token mint',
+    placeholder: 'Mint address',
+    hint: 'The launch to look for clustered buyers around.',
+    kind: 'address',
+  },
+  watchlist: {
+    label: 'First address',
+    placeholder: 'Wallet address',
+    hint: 'The first address to watch. Add the rest after the first digest.',
+    kind: 'address',
+  },
+}
+
+/** Falls back to a plain address for a service the frontend has not met yet. */
+export const inputSpec = (serviceId: string): InputSpec =>
+  INPUT_SPEC[serviceId] ?? {
+    label: 'Address',
+    placeholder: 'Solana address',
+    hint: 'The address this job should run against.',
+    kind: 'address',
+  }
 
 export const SERVICES: Service[] = [
   {
@@ -272,6 +347,8 @@ export const DECISIONS: Decision[] = [
  */
 export type Job = {
   id: string
+  /** the server id, unprefixed — what /api/reports/:orderId expects */
+  rawId: string
   service: string
   /** SOL | USDC | $CHIPS */
   payer: string
@@ -295,8 +372,15 @@ export type Job = {
   paidAt: string
   paymentSig: string
   receiptSig: string | null
-  /** only the hash goes on chain — the report body stays private to the payer */
+  /**
+   * sha256 of the report. The full body is ALSO published — on chain in memo
+   * chunks and via GET /api/reports/:orderId — so this is a checksum, not a
+   * privacy measure.
+   */
   reportHash: string | null
+  /** server-built explorer links; null when there is no signature to link to */
+  paymentUrl: string | null
+  receiptUrl: string | null
 }
 
 /** Payer-only, from `GET /api/orders/:id?token=`. Never in the public list. */
@@ -308,46 +392,46 @@ export type JobPrivate = {
 
 export const JOBS: Job[] = [
   {
-    id: '#0412', service: 'Token safety check', payer: '$CHIPS', amountUsd: 5.4, chips: true,
+    id: '#0412', rawId: '0412', service: 'Token safety check', payer: '$CHIPS', amountUsd: 5.4, chips: true,
     status: 'running', awaitingDelivery: true, terminal: false, etaMinutes: 3, etaDeadline: '12:12', deliveredAt: null,
     createdAt: '12:04:11', paidAt: '12:04:33', paymentSig: '5xQ2…mb3z',
-    receiptSig: null, reportHash: null,
+    receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0411', service: 'Transaction trace', payer: 'USDC', amountUsd: 9, chips: false,
+    id: '#0411', rawId: '0411', service: 'Transaction trace', payer: 'USDC', amountUsd: 9, chips: false,
     status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 23, etaDeadline: '12:12', deliveredAt: null,
     createdAt: '11:51:50', paidAt: '11:52:18', paymentSig: '7bTn…Lp4w',
-    receiptSig: null, reportHash: null,
+    receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0410', service: 'Wallet activity report', payer: '$CHIPS', amountUsd: 3.6, chips: true,
+    id: '#0410', rawId: '0410', service: 'Wallet activity report', payer: '$CHIPS', amountUsd: 3.6, chips: true,
     status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 35, etaDeadline: '11:10', deliveredAt: null,
     createdAt: '10:57:44', paidAt: '10:58:12', paymentSig: '8mCd…Yu2p',
-    receiptSig: null, reportHash: null,
+    receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0409', service: 'Bundle / cluster detection', payer: 'SOL', amountUsd: 12, chips: false,
+    id: '#0409', rawId: '0409', service: 'Bundle / cluster detection', payer: 'SOL', amountUsd: 12, chips: false,
     status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 60, etaDeadline: '10:28', deliveredAt: null,
     createdAt: '10:02:51', paidAt: '10:03:19', paymentSig: '6Vb2…Ax5j',
-    receiptSig: null, reportHash: null,
+    receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0408', service: 'Program IDL brief', payer: '$CHIPS', amountUsd: 7.2, chips: true,
+    id: '#0408', rawId: '0408', service: 'Program IDL brief', payer: '$CHIPS', amountUsd: 7.2, chips: true,
     status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '11:06', deliveredAt: '11:04',
     createdAt: '10:47:39', paidAt: '10:48:11', paymentSig: '2Hx9…Rt6v',
-    receiptSig: '2Hx9…Rt6v', reportHash: 'a4f9c118…7e21',
+    receiptSig: '2Hx9…Rt6v', reportHash: 'a4f9c118…7e21', paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0407', service: 'Token safety check', payer: 'SOL', amountUsd: 6, chips: false,
+    id: '#0407', rawId: '0407', service: 'Token safety check', payer: 'SOL', amountUsd: 6, chips: false,
     status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '10:42', deliveredAt: '10:41',
     createdAt: '10:33:30', paidAt: '10:34:02', paymentSig: '1Pw4…Gh8n',
-    receiptSig: '4Nq7…Zk9s', reportHash: 'c2b7e04d…9f13',
+    receiptSig: '4Nq7…Zk9s', reportHash: 'c2b7e04d…9f13', paymentUrl: null, receiptUrl: null,
   },
   {
-    id: '#0406', service: 'Watchlist digest', payer: '$CHIPS', amountUsd: 13.5, chips: true,
+    id: '#0406', rawId: '0406', service: 'Watchlist digest', payer: '$CHIPS', amountUsd: 13.5, chips: true,
     status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '09:14', deliveredAt: '09:00',
     createdAt: '08:13:58', paidAt: '08:14:22', paymentSig: '3Rk8…Bn2f',
-    receiptSig: '5Tz6…Kv1c', reportHash: '77d1a35b…4c08',
+    receiptSig: '5Tz6…Kv1c', reportHash: '77d1a35b…4c08', paymentUrl: null, receiptUrl: null,
   },
 ]
 

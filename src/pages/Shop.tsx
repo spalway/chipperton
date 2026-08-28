@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { chipsPrice, measuredTurnaroundMins, usd } from '../data'
+import { chipsPrice, measuredTurnaroundMins, turnaroundLabel, usd, type Service } from '../data'
 import { useResolved } from '../useLiveData'
 import Motto from '../components/Motto'
+import BuyPanel from '../components/BuyPanel'
+import { useWallet } from '../WalletProvider'
 
 const STEPS = [
   {
     k: '01 · pay',
-    t: 'Connect a wallet and pay for a job. Funds go straight into the program-controlled vault.',
+    t: "Connect a wallet and pay for a job. Funds go straight into the agent's own wallet.",
   },
   {
     k: '02 · queue',
@@ -14,12 +16,14 @@ const STEPS = [
   },
   {
     k: '03 · deliver',
-    t: 'You get the report and an on-chain receipt. If it misses its estimate, the program refunds you.',
+    t: 'You get the report and an on-chain receipt. If it misses its estimate, Chipperton refunds you.',
   },
 ]
 
 export default function Shop() {
   const { services, isLive, status, queue } = useResolved()
+  const { address } = useWallet()
+  const [buying, setBuying] = useState<Service | null>(null)
   // The server reports whether $CHIPS can actually be paid with. It is false
   // while the token has no mint — pump.fun is mainnet-only and payments settle
   // on devnet — so offering it would be a button that cannot work.
@@ -47,7 +51,7 @@ export default function Shop() {
             <i className="dot" />
             pay with
           </h2>
-          <span className="meta">payment goes to the vault, not an operator wallet</span>
+          <span className="meta">payment goes straight to the agent&apos;s wallet</span>
         </div>
         <div className="stats" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <div
@@ -80,7 +84,7 @@ export default function Shop() {
           </h2>
           <span className="meta">
             backlog {backlog} job{backlog === 1 ? '' : 's'}
-            {turnaround ? ` · ${turnaround} min median turnaround, measured` : ''}
+            {turnaround ? ` · ${turnaroundLabel(turnaround)} median turnaround, measured` : ''}
           </span>
         </div>
         <div className="shop">
@@ -98,8 +102,8 @@ export default function Shop() {
               <div className="foot">
                 <span className="tt">{s.active ? s.turnaround : 'not yet available'}</span>
                 {s.active ? (
-                  <button className="buy" type="button">
-                    Buy
+                  <button className="buy" type="button" onClick={() => setBuying(s)}>
+                    {address ? 'Buy' : 'Buy →'}
                   </button>
                 ) : (
                   <span className="soonchip">soon</span>
@@ -126,6 +130,8 @@ export default function Shop() {
           ))}
         </div>
       </section>
+
+      {buying && <BuyPanel service={buying} onClose={() => setBuying(null)} />}
 
       <Motto green place="bottom" />
     </div>

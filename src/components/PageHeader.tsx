@@ -29,8 +29,7 @@ export default function PageHeader() {
         </div>
         <p className="disc">
           Jobs are worked in <b>queue order</b>, not by who paid most. Turnaround times are
-          estimates the agent sets itself — if it misses one, the program refunds you
-          automatically.
+          estimates the agent sets itself — if it misses one, Chipperton refunds you.
         </p>
       </div>
     </header>

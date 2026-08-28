@@ -1,11 +1,59 @@
 import { useState } from 'react'
 import { JOB_PRIVATE, usd, type Job, type View } from '../data'
 import { useResolved } from '../useLiveData'
+import { useReport } from '../useReport'
 
 type Props = {
   jobId: string | null
   go: (v: View) => void
   openJob: (id: string | null) => void
+}
+
+/**
+ * The delivered report, in full. Published on chain in memo chunks as well as
+ * here — so the chunk links are the actual bytes, not a reference to them.
+ */
+function Report({ orderId }: { orderId: string }) {
+  const { report, loading, error } = useReport(orderId)
+
+  if (loading) return <div className="rep loading">loading report…</div>
+  // a 404 here means refunded — the caller only mounts this when a hash exists,
+  // so anything else is a genuine fetch failure worth showing rather than hiding
+  if (error || !report) return null
+
+  return (
+    <div className="rep">
+      <div className="rephead">
+        <span>report · {report.serviceId}</span>
+        <span className="chunks">
+          {/* these point at explorer.solana.com, which decodes spl-memo — Solscan
+              shows the same transaction as "Unknown" with the text nowhere on
+              the page, so the bytes would be published but not readable */}
+          published on chain:{' '}
+          {report.chunkUrls.map((u, i) => (
+            <a key={u} href={u} target="_blank" rel="noreferrer">
+              {i + 1}/{report.chunkUrls.length}
+            </a>
+          ))}
+        </span>
+      </div>
+      <div className="repinput">
+        <span className="k">subject</span> {report.input}
+      </div>
+      <pre className="repbody">{report.report}</pre>
+      <div className="repfoot">
+        <span>
+          sha256 <b>{report.reportHash}</b>
+        </span>
+        {report.receiptUrl && (
+          <a href={report.receiptUrl} target="_blank" rel="noreferrer">
+            receipt ↗
+          </a>
+        )}
+      </div>
+      <div className="repverify">{report.verify}</div>
+    </div>
+  )
 }
 
 function Detail({
@@ -65,7 +113,15 @@ function Detail({
         <div className="jf">
           <div className="k">Payment tx</div>
           <div className="v">
-            <a href="#">{job.paymentSig}</a>
+            {/* the URL is server-built — a client-side ?cluster= would keep
+                resolving to the wrong chain after the mainnet flip */}
+            {job.paymentUrl ? (
+              <a href={job.paymentUrl} target="_blank" rel="noreferrer">
+                {job.paymentSig}
+              </a>
+            ) : (
+              job.paymentSig
+            )}
           </div>
         </div>
 
@@ -97,8 +153,12 @@ function Detail({
         <div className="jf">
           <div className="k">Receipt</div>
           <div className="v">
-            {job.receiptSig ? (
-              <a href="#">{job.receiptSig}</a>
+            {job.receiptSig && job.receiptUrl ? (
+              <a href={job.receiptUrl} target="_blank" rel="noreferrer">
+                {job.receiptSig}
+              </a>
+            ) : job.receiptSig ? (
+              job.receiptSig
             ) : (
               // a refunded job is never delivered, so "on delivery" would be false
               <span className="mut">{ended ? 'none — refunded' : 'on delivery'}</span>
@@ -153,17 +213,19 @@ function Detail({
           </>
         ) : (
           <span className="promo">
-            These fields are not in the public response at all. Reading them needs the order's
-            access token, which only the paying wallet holds.
+            The paying wallet is not returned by the queue API. What was submitted is no longer
+            private — it is published with the report.
           </span>
         )}
       </div>
 
+      {job.reportHash && <Report orderId={job.rawId} />}
+
       <p className="disc" style={{ margin: '14px 0 0', textAlign: 'left', maxWidth: '74ch' }}>
-        The queue is public: what was bought, what it cost, and the transactions that settled
-        it. <b>What you asked about and which wallet asked is not.</b> Only the hash of the
-        report goes on chain — enough for you to prove your report is the one Chipperton
-        signed, without publishing what you looked up.
+        <b>Everything about a delivered order is public.</b> What was bought, what it cost, what
+        was asked, and the full report body — published on chain in chunks, not just its hash,
+        so the report is recoverable from Solana alone. The paying wallet is not returned by the
+        API, but the payment transaction is, so the two can be linked by anyone who looks.
       </p>
     </div>
   )

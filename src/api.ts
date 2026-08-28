@@ -22,6 +22,8 @@ export type CostBasisField = 'declared' | 'measured'
  */
 export type StatusResponse = {
   vaultAddress: string
+  /** Where refunds are paid from. Drains as the vault fills. */
+  hotWalletAddress: string
   vaultLamports: number
   /** COUNTED on-chain. Authoritative — never derive this from a ledger. */
   vaultUsd: number
@@ -51,6 +53,8 @@ export type StatusResponse = {
   payCluster: string
   /** false while $CHIPS has no mint — the discount path cannot function. */
   chipsEnabled: boolean
+  vaultUrl: string | null
+  hotWalletUrl: string | null
 }
 
 export type ServiceResponse = {
@@ -98,6 +102,11 @@ export type QueueResponse = {
   receiptSig: string | null
   /** Public: the same hash is broadcast in the receipt memo on chain. */
   reportHash: string | null
+  /* Explorer links are built SERVER-side because the cluster is a server concern:
+     a client hardcoding ?cluster=devnet keeps producing links that resolve, to the
+     wrong chain, the moment payments move to mainnet — no error, just wrong. */
+  paymentUrl: string | null
+  receiptUrl: string | null
 }
 
 export type CostEntry = {
@@ -124,6 +133,40 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (!res.ok) throw new ApiError(`${path} → ${res.status}`)
   return (await res.json()) as T
 }
+
+/**
+ * A delivered report. Public and unauthenticated — the body is also published
+ * on chain in memo chunks, so `chunkUrls` are the actual bytes rather than a
+ * reference to them.
+ *
+ * Refunded/expired orders 404: there was no delivery, so there is no report and
+ * never will be. Gate the fetch on `reportHash`, don't enumerate statuses.
+ */
+export type ReportResponse = {
+  orderId: string
+  serviceId: string
+  input: string
+  paidAt: string | null
+  deliveredAt: string | null
+  report: string
+  reportHash: string
+  receiptSig: string | null
+  receiptUrl: string | null
+  chunkSigs: string[]
+  /**
+   * explorer.solana.com — the only major explorer that DECODES spl-memo
+   * instruction data. Solscan renders these same transactions as
+   * "Memo Program V2: Unknown" with the text absent from the page, so linking
+   * there published the data without delivering the feature.
+   */
+  chunkUrls: string[]
+  /** Solscan equivalents — secondary, for balance/token views. */
+  chunkUrlsSolscan: string[]
+  verify: string
+}
+
+export const getReport = (orderId: string, s?: AbortSignal) =>
+  get<ReportResponse>(`/api/reports/${encodeURIComponent(orderId)}`, s)
 
 export const getStatus = (s?: AbortSignal) => get<StatusResponse>('/api/status', s)
 export const getServices = (s?: AbortSignal) => get<ServiceResponse[]>('/api/services', s)

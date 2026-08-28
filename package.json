@@ -12,6 +12,11 @@
     "test:watch": "vitest --config vitest.config.ts"
   },
   "dependencies": {
+    "@solana/wallet-standard-chains": "^1.1.2",
+    "@solana/wallet-standard-features": "^1.4.0",
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
+    "bs58": "^6.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

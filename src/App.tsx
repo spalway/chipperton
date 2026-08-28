@@ -8,9 +8,23 @@ import Activity from './pages/Activity'
 import Docs from './pages/Docs'
 import Jobs from './pages/Jobs'
 import { Costs, HistoryPage, DecisionsPage } from './pages/Receipts'
+import LiveDataProvider from './LiveDataProvider'
+import WalletProvider from './WalletProvider'
 import type { View } from './data'
 
 export default function App() {
+  return (
+    // WalletProvider sits inside, because the chain it signs on comes from the
+    // server's payCluster — the wallet layer must not decide that for itself
+    <LiveDataProvider>
+      <WalletProvider>
+        <Shell />
+      </WalletProvider>
+    </LiveDataProvider>
+  )
+}
+
+function Shell() {
   const [view, setView] = useState<View>('overview')
   const [jobId, setJobId] = useState<string | null>(null)
 
@@ -31,7 +45,7 @@ export default function App() {
         <PageHeader />
         {view === 'overview' && <Overview go={go} openJob={openJob} />}
         {view === 'shop' && <Shop />}
-        {view === 'activity' && <Activity go={go} openJob={openJob} />}
+        {view === 'activity' && <Activity />}
         {view === 'docs' && <Docs go={go} />}
         {view === 'jobs' && <Jobs jobId={jobId} go={go} openJob={openJob} />}
         {view === 'costs' && <Costs go={go} />}
