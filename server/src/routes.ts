@@ -179,9 +179,9 @@ app.get('/api/status', async (c) => {
     dailyCostBasisReason:
       basis === 'measured'
         ? `observed from ${spend.sampleCount} ledger entries over ` +
-          `${spend.hoursObserved.toFixed(1)}h`
+          `${humanDuration(spend.hoursObserved * 3600)}`
         : `needs 5+ entries spanning 24h+ to be a rate; have ` +
-          `${spend.sampleCount} over ${spend.hoursObserved.toFixed(1)}h`,
+          `${spend.sampleCount} over ${humanDuration(spend.hoursObserved * 3600)}`,
 
     runwayDays:
       vaultUsd === null || effectiveCostUsd <= 0 ? null : vaultUsd / effectiveCostUsd,
@@ -204,6 +204,10 @@ app.get('/api/status', async (c) => {
     // SCHEDULED, not guaranteed — the worker is a cron tick, not a promise.
     nextTickAt: lastTickAt ? new Date(Date.parse(lastTickAt) + interval * 1000).toISOString() : null,
     medianTurnaroundMinutes: turnaround,
+    /** Same measurement in SECONDS — the finest unit the data actually has.
+     *  Prefer this for display: choosing the unit at format time is what
+     *  stops a 25-second turnaround rendering as "0 min". */
+    medianTurnaroundSeconds: turnaround === null ? null : turnaround * 60,
     payCluster: config.payCluster,
 
     /* ---- live settings ------------------------------------------------
@@ -260,9 +264,32 @@ interface AgendaInput {
   dailyCostBasis: string;
 }
 
+/**
+ * Pick the unit at format time rather than dividing to one unit first.
+ *
+ * `toFixed(1)` on an hours figure renders 84 seconds as "0.0h", which reads as
+ * nothing having happened. Same family as a 25-second turnaround rendering as
+ * "0 min" — a value coarsened before the formatter could choose its words.
+ */
+function humanDuration(seconds: number): string {
+  if (seconds < 90) return `${Math.round(seconds)}s`;
+  if (seconds < 5400) return `${Math.round(seconds / 60)}min`;
+  if (seconds < 172800) return `${(seconds / 3600).toFixed(1)}h`;
+  return `${(seconds / 86400).toFixed(1)}d`;
+}
+
 /** Ordered most-blocking first. Only conditions that are currently true appear. */
 function buildAgenda(s: AgendaInput) {
-  const sol = (n: number) => `${(n / LAMPORTS_PER_SOL).toFixed(4)} SOL`;
+  /**
+   * Never let a non-zero balance render as "0.0000 SOL". A wallet holding
+   * 5,000 lamports is not empty, and printing it as empty in the sentence
+   * explaining WHY the shop is closed would misstate the reason.
+   */
+  const sol = (n: number) => {
+    if (n === 0) return '0 SOL';
+    const s = n / LAMPORTS_PER_SOL;
+    return s < 0.0001 ? `<0.0001 SOL` : `${s.toFixed(4)} SOL`;
+  };
   const items: { kind: 'blocked' | 'waiting' | 'working'; title: string; detail: string; clearsWhen: string }[] = [];
 
   if (!s.canHonourRefunds) {
@@ -474,6 +501,17 @@ app.get('/api/queue', async (c) => {
         etaDeadline: o.eta_deadline,
         /** Live ESTIMATE, moves as the queue drains. Never a promise. */
         etaMinutes: position < 0 || perJob === null ? null : (position + 1) * perJob,
+        /**
+         * The same estimate in SECONDS.
+         *
+         * Minutes is the wrong unit at both ends of the range: a job about to
+         * run reads "0 min", and a deep queue reads "1440 min" rather than
+         * "24 h". Sending seconds lets the formatter pick the unit instead of
+         * inheriting one that was already chosen — the fix for the whole
+         * family of these, rather than a ladder bolted onto each.
+         */
+        etaSeconds:
+          position < 0 || perJob === null ? null : (position + 1) * perJob * 60,
         /** Whether etaMinutes came from observed turnaround or a declared
          *  per-service guess. The UI must not call it measured unless this
          *  says 'measured'. */
@@ -883,7 +921,15 @@ async function observedSpend(): Promise<{
   };
 }
 
-/** Measured from two on-chain timestamps, not estimated. */
+/**
+ * Measured from two on-chain timestamps, not estimated.
+ *
+ * Returned in MINUTES for compatibility, but /api/status also carries the
+ * seconds figure. Dividing to minutes here forces every consumer to format
+ * from a coarser unit than the data has — which is the shape behind
+ * "0.42136666666666667 min", "every 1 minutes" and "in ~0 min": a division
+ * that discards the range the formatter needed to pick its words.
+ */
 async function medianTurnaroundMinutes(): Promise<number | null> {
   const { data } = await db
     .from('orders')
