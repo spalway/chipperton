@@ -162,22 +162,39 @@ const QUEUE_PAGE_LIMIT = 25;
 const TERMINAL: ReadonlySet<string> = new Set(['delivered', 'refunded', 'expired', 'failed']);
 
 /**
- * Fields like `receiptSig`, `reportHash` and `deliveredAt` are "empty now,
- * filled on delivery" — EXCEPT when the order ended without ever being
- * delivered, where they are empty forever.
+ * Which phase an order is in, as three flags rather than a status string the
+ * client has to interpret.
  *
- * Sending a bare null for both cases makes every client re-derive "will this
- * ever arrive?" from status semantics it has to know. That inference is exactly
- * what produced a "Receipt: on delivery" label on an already-refunded job. So
- * the server states it instead of making the client work it out.
+ * EXACTLY ONE of awaitingPayment / awaitingDelivery / terminal is true for
+ * every status. That completeness is the point — a client can branch on all
+ * three and never land in an unhandled state.
+ *
+ * Fields like `receiptSig`, `reportHash` and `deliveredAt` are "empty now,
+ * filled on delivery" EXCEPT when the order ended without ever being
+ * delivered, where they are empty forever. A bare null for both cases makes
+ * every client re-derive "will this ever arrive?" from status semantics, which
+ * is what produced a "Receipt: on delivery" label on an already-refunded job.
+ *
+ * `awaitingPayment` exists because the first version of this shipped only two
+ * flags, and an unpaid order was then false for both — neither finished nor
+ * coming. That is the same missing-state bug the two flags were added to
+ * remove, reintroduced one endpoint over: the queue never carries unpaid
+ * orders so it never showed, while order detail is unpaid for the entire
+ * window a buyer sits watching the screen.
  */
 function lifecycle(status: string) {
   return {
+    /**
+     * Waiting for the buyer's payment to land. Only ever true on
+     * /api/orders/:id — the public queue holds no unpaid orders, so this is
+     * always false there.
+     */
+    awaitingPayment: status === 'pending',
+    /** Paid, and a report and receipt are still expected. When false and
+     *  receiptSig is null, that null is permanent. */
+    awaitingDelivery: status === 'paid' || status === 'running',
     /** Nothing about this order will change again. */
     terminal: TERMINAL.has(status),
-    /** A report and receipt are still expected. When false and receiptSig is
-     *  null, that null is permanent — do not render it as pending. */
-    awaitingDelivery: status === 'paid' || status === 'running',
   };
 }
 
