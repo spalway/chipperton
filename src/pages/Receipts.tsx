@@ -6,6 +6,7 @@ import {
   TREASURY,
   closestCall,
   costTotal,
+  isMeasuredCost,
   today,
   usd,
   type View,
@@ -28,14 +29,30 @@ const Back = ({ go }: { go: (v: View) => void }) => (
 
 export function Costs({ go }: { go: (v: View) => void }) {
   const total = costTotal()
+  const measured = isMeasuredCost()
+
   return (
     <div>
       <Back go={go} />
       <div className="rc" style={{ marginTop: 16 }}>
-        <h2 className="rt">Daily operating cost</h2>
+        <h2 className="rt">Daily operating cost — {measured ? 'measured' : 'declared'}</h2>
         <div className="sub">
-          day {AGENT.day} · {AGENT.date} · drawn from the wallet at 08:15 UTC
+          day {AGENT.day} · {AGENT.date} ·{' '}
+          {measured ? 'observed from the cost ledger' : 'configured, not yet measured'}
         </div>
+
+        {!measured && (
+          <div className="callout" style={{ margin: '10px 0 12px' }}>
+            <div className="k">Not a receipt yet</div>
+            <p>
+              This is how the declared <b>{usd(total)}</b> is allocated, not a record of money
+              observed leaving the wallet. Per-job token spend is not being recorded yet, so no
+              transaction is cited below and <b>runway is a projection built on this figure</b>,
+              not a measurement.
+            </p>
+          </div>
+        )}
+
         <hr />
 
         {COST_LINES.map((c) => (
@@ -50,26 +67,22 @@ export function Costs({ go }: { go: (v: View) => void }) {
         ))}
 
         <div className="tot">
-          <span>TOTAL</span>
+          <span>TOTAL {measured ? 'SPENT' : 'DECLARED'}</span>
           <span className="d" />
           <span className="n">{usd(total)}</span>
         </div>
 
         <hr />
         <div className="line">
-          <span>Settled in one transaction</span>
-          <span className="d" />
-          <span className="n">{COST_LINES[0].sig}</span>
-        </div>
-        <div className="line">
-          <span>Runway bought by this spend</span>
+          <span>Runway this covers</span>
           <span className="d" />
           <span className="n">1.00 day</span>
         </div>
 
         <div className="foot">
-          The cost is fixed per day and drawn in a single transfer, so it appears once in the
-          ledger rather than as a drip. If Chipperton cannot cover it, it stops.
+          {measured
+            ? 'Every line is a recorded cost with a transaction behind it. If Chipperton cannot cover the total, it stops.'
+            : 'The total is the number runway divides by, so it is the single most load-bearing figure on the site — and the one currently least supported. It becomes a real receipt once per-job token spend is recorded.'}
         </div>
       </div>
     </div>
@@ -92,6 +105,18 @@ export function HistoryPage({ go }: { go: (v: View) => void }) {
           opened {usd(TREASURY.openingUsd)} · now {usd(TREASURY.balanceUsd)} ·{' '}
           {HISTORY.length} days
         </div>
+
+        {!isMeasuredCost() && (
+          <div className="callout" style={{ margin: '10px 0 12px' }}>
+            <div className="k">Cost column is declared</div>
+            <p>
+              Earned and spent are counted. The <b>Cost</b> column is the configured{' '}
+              {usd(TREASURY.dailyCostUsd)}/day, not observed spend — so every Close and Runway
+              figure below inherits that assumption.
+            </p>
+          </div>
+        )}
+
         <hr />
 
         <table>
@@ -155,8 +180,9 @@ export function HistoryPage({ go }: { go: (v: View) => void }) {
 
         <div className="foot">
           Every close is the previous close plus what it earned, minus what it spent, minus the
-          fixed daily cost. Nothing here is entered by hand — the table and the headline balance
-          are computed from the same ledger.
+          daily cost. The table and the headline balance are computed from one ledger, so they
+          cannot disagree — but a shared source is not the same as a verified one, and the cost
+          input is {isMeasuredCost() ? 'measured' : 'still declared'}.
         </div>
       </div>
     </div>

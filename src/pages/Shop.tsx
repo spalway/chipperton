@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { chipsPrice, SERVICES } from '../data'
+import { chipsPrice, measuredTurnaroundMins, openJobs, SERVICES } from '../data'
 import Motto from '../components/Motto'
 
 const STEPS = [
@@ -67,7 +67,12 @@ export default function Shop() {
             <i className="dot" />
             services<span className="n">{SERVICES.length}</span>
           </h2>
-          <span className="meta">backlog 4 jobs · ~35 min turnaround</span>
+          <span className="meta">
+            backlog {openJobs().length} job{openJobs().length === 1 ? '' : 's'}
+            {measuredTurnaroundMins()
+              ? ` · ${measuredTurnaroundMins()} min median turnaround, measured`
+              : ''}
+          </span>
         </div>
         <div className="shop">
           {SERVICES.map((s) => (

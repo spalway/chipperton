@@ -98,15 +98,35 @@ export const TREASURY = {
   openingUsd: OPENING_USD,
 }
 
-/** Today's cost lines — what the daily operating cost is actually made of. */
-export type CostLine = { item: string; detail: string; usd: number; sig: string | null }
+/**
+ * Where the daily cost figure comes from. Mirrors `dailyCostBasis` from
+ * /api/status.
+ *
+ * 'declared' — a configured constant. Nothing observes the agent spending it,
+ *              so runway built on it is a PROJECTION, not a measurement, and
+ *              the UI must say so.
+ * 'measured' — computed from a costs ledger of real per-job token spend.
+ *
+ * Every label that touches cost or runway reads this. Flipping it is the only
+ * change needed when the backend starts measuring.
+ */
+export type CostBasis = 'declared' | 'measured'
+export const COST_BASIS = 'declared' as CostBasis
+export const isMeasuredCost = () => COST_BASIS === 'measured'
+
+/**
+ * Allocation of the daily cost. While COST_BASIS is 'declared' these are an
+ * assumed split of a typed number — NOT observed spend — so nothing here may be
+ * rendered with a transaction signature or called a settlement.
+ */
+export type CostLine = { item: string; detail: string; usd: number }
 
 export const COST_LINES: CostLine[] = [
-  { item: 'Inference', detail: 'model calls · 6 jobs delivered', usd: 9.6, sig: '9Jd3…Wm7q' },
-  { item: 'RPC', detail: 'helius plan, daily amortised', usd: 4.2, sig: '9Jd3…Wm7q' },
-  { item: 'Compute', detail: 'worker + scheduler', usd: 3.1, sig: '9Jd3…Wm7q' },
-  { item: 'Storage', detail: 'postgres + report blobs', usd: 1.0, sig: '9Jd3…Wm7q' },
-  { item: 'Network fees', detail: 'receipt memos · 6 txs', usd: 0.5, sig: '9Jd3…Wm7q' },
+  { item: 'Inference', detail: 'model calls', usd: 9.6 },
+  { item: 'RPC', detail: 'helius plan, daily amortised', usd: 4.2 },
+  { item: 'Compute', detail: 'worker + scheduler', usd: 3.1 },
+  { item: 'Storage', detail: 'postgres + report blobs', usd: 1.0 },
+  { item: 'Network fees', detail: 'receipt memos', usd: 0.5 },
 ]
 
 export const costTotal = () => COST_LINES.reduce((a, c) => a + c.usd, 0)
@@ -333,8 +353,30 @@ export const openJobs = () => JOBS.filter((j) => j.status !== 'delivered')
 export const deliveredToday = () => JOBS.filter((j) => j.status === 'delivered').length
 export const runwayDays = () => TREASURY.balanceUsd / TREASURY.dailyCostUsd
 
-/** Mean ETA across everything still in the queue. */
-export const avgTurnaroundMins = () => {
+const toMins = (t: string) => {
+  const [h, m, s] = t.split(':').map(Number)
+  return h * 60 + m + (s ?? 0) / 60
+}
+
+/**
+ * MEASURED turnaround — median of (deliveredAt − paidAt) over delivered jobs.
+ * Both endpoints are on-chain blockTimes, so this is an observed fact, not a
+ * projection. This is the only number allowed to be labelled "turnaround".
+ */
+export const measuredTurnaroundMins = () => {
+  const done = JOBS.filter((j) => j.status === 'delivered' && j.deliveredAt)
+  if (!done.length) return null
+  const mins = done.map((j) => toMins(j.deliveredAt!) - toMins(j.paidAt)).sort((a, b) => a - b)
+  const mid = Math.floor(mins.length / 2)
+  return Math.round(mins.length % 2 ? mins[mid] : (mins[mid - 1] + mins[mid]) / 2)
+}
+
+/**
+ * PROJECTION — mean remaining wait across jobs still in the queue. Named for
+ * what it is so it cannot be rendered as a measured turnaround: averaging the
+ * remaining time on unfinished work says nothing about how long work takes.
+ */
+export const pendingEtaMins = () => {
   const open = openJobs().filter((j) => j.etaMinutes != null)
   if (!open.length) return null
   return Math.round(open.reduce((a, j) => a + (j.etaMinutes ?? 0), 0) / open.length)
@@ -361,7 +403,9 @@ export const LOG: LogEntry[] = [
   { ts: '10:03:19', action: 'IN', kind: 'in', msg: '+$12.00 SOL', note: '— job #0409 bundle detection', sig: '6Vb2…Ax5j' },
   { ts: '09:47:08', action: 'IN', kind: 'in', msg: '+$6.00 SOL', note: '— job #0407 token safety check', sig: '1Pw4…Gh8n' },
   { ts: '09:00:12', action: 'JOB', kind: 'job', msg: 'delivered #0406 watchlist digest', note: '— 25 addresses, 3 movements', sig: '5Tz6…Kv1c' },
-  { ts: '08:15:00', action: 'COST', kind: 'sys', msg: '−$18.40', note: '— daily operating cost drawn from vault', sig: '9Jd3…Wm7q' },
+  // No signature: while COST_BASIS is 'declared' nothing observes this leaving the
+  // wallet, so citing a tx here would dress an assumption as an on-chain fact.
+  { ts: '08:15:00', action: 'COST', kind: 'sys', msg: '−$18.40', note: '— daily operating cost, declared', sig: null },
   { ts: '08:14:22', action: 'IN', kind: 'in', msg: '+$13.50 in $CHIPS', note: '— job #0406 watchlist digest, weekly', sig: '3Rk8…Bn2f' },
   { ts: '07:52:41', action: 'SYS', kind: 'sys', msg: 'runway recalculated', note: '— 41.2d → 45.7d after morning receipts', sig: null },
   { ts: '00:00:03', action: 'SYS', kind: 'sys', msg: 'day 23 opened', note: '— vault $806.97, cost $18.40, 4 jobs carried over', sig: '8Gm1…Qp3d' },

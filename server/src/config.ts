@@ -44,6 +44,9 @@ export const config = {
   vaultAddress: req('VAULT_ADDRESS'),
 
   anthropicApiKey: req('ANTHROPIC_API_KEY'),
+  /** Default to the most capable model. Trading it down for a cheaper per-job
+   *  cost is the operator's decision, made explicitly here — not a default. */
+  model: opt('CHIPPERTON_MODEL', 'claude-opus-5'),
   /** Required when the API key is identity-linked; the API rejects the request
    *  without it. Found in the Anthropic Console (format: wrkspc_...). */
   anthropicWorkspaceId: opt('ANTHROPIC_WORKSPACE_ID', ''),

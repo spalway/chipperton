@@ -3,8 +3,8 @@ import {
   DECISIONS,
   JOBS,
   SERVICES,
-  avgTurnaroundMins,
   deliveredToday,
+  measuredTurnaroundMins,
   openJobs,
   usd,
   type View,
@@ -23,7 +23,7 @@ type Props = { go: (v: View) => void; openJob: (id: string | null) => void }
 export default function Overview({ go, openJob }: Props) {
   // every figure below is derived from the day ledger / JOBS — nothing hand-typed
   const open = openJobs()
-  const turnaround = avgTurnaroundMins()
+  const turnaround = measuredTurnaroundMins()
 
   const nav = (v: View) => (e: React.MouseEvent) => {
     e.preventDefault()
@@ -152,7 +152,7 @@ export default function Overview({ go, openJob }: Props) {
           </h2>
           <span className="meta">
             {deliveredToday()} delivered today
-            {turnaround ? ` · ~${turnaround} min average turnaround` : ''}
+            {turnaround ? ` · ${turnaround} min median turnaround, measured` : ''}
           </span>
         </div>
         <table className="qt">

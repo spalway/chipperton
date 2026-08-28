@@ -13,27 +13,48 @@ app.use('/*', cors({ origin: config.corsOrigin }));
 /* ------------------------------------------------------------------ status */
 
 app.get('/api/status', async (c) => {
-  const [{ value: balance }, solUsd, state, counts, turnaround] = await Promise.all([
-    rpcPay.getBalance(vaultAddress).send(),
-    solPriceUsd(),
-    db.from('agent_state').select('*').eq('id', 1).single(),
-    db.from('orders').select('status', { count: 'exact', head: false }).in('status', ['paid', 'running']),
-    medianTurnaroundMinutes(),
-  ]);
+  const [{ value: balance }, solUsd, state, counts, turnaround, measuredCost] =
+    await Promise.all([
+      rpcPay.getBalance(vaultAddress).send(),
+      solPriceUsd(),
+      db.from('agent_state').select('*').eq('id', 1).single(),
+      db
+        .from('orders')
+        .select('status', { count: 'exact', head: false })
+        .in('status', ['paid', 'running']),
+      medianTurnaroundMinutes(),
+      measuredDailyCostUsd(),
+    ]);
 
   const vaultLamports = Number(balance);
   const vaultUsd = solUsd === null ? null : (vaultLamports / LAMPORTS_PER_SOL) * solUsd;
-  const dailyCostUsd = Number(state.data?.daily_cost_usd ?? config.dailyCostUsd);
+  const declaredCostUsd = Number(state.data?.daily_cost_usd ?? config.dailyCostUsd);
   const interval = Number(state.data?.tick_interval_seconds ?? config.tickIntervalSeconds);
   const lastTickAt = state.data?.last_tick_at ?? null;
+
+  // Prefer what the agent has actually been observed spending. Fall back to the
+  // declared figure, and SAY which one is in play — a runway computed from a
+  // hardcoded cost is a projection, and must not be rendered as a measurement.
+  const basis = measuredCost !== null && measuredCost > 0 ? 'measured' : 'declared';
+  const effectiveCostUsd = basis === 'measured' ? measuredCost! : declaredCostUsd;
 
   return c.json({
     vaultAddress: vaultAddress.toString(),
     vaultLamports,
     vaultUsd,
-    dailyCostUsd,
-    // Real: balance is on-chain, cost is declared. Null if we can't price SOL.
-    runwayDays: vaultUsd === null || dailyCostUsd <= 0 ? null : vaultUsd / dailyCostUsd,
+
+    /** Config constant. An assumption, not an observation. */
+    dailyCostUsd: declaredCostUsd,
+    /** Observed from the costs ledger over a trailing window. Null until there
+     *  is spend to measure. */
+    measuredDailyCostUsd: measuredCost,
+    /** 'measured' | 'declared' — which figure runwayDays actually used.
+     *  The UI must not call runway "measured" unless this says so. */
+    dailyCostBasis: basis,
+
+    runwayDays:
+      vaultUsd === null || effectiveCostUsd <= 0 ? null : vaultUsd / effectiveCostUsd,
+
     backlog: counts.data?.length ?? 0,
     lastTickAt,
     tickIntervalSeconds: interval,
@@ -274,6 +295,14 @@ async function solPriceUsd(): Promise<number | null> {
   } catch {
     return solPriceCache.usd;
   }
+}
+
+/** Observed spend per day from the costs ledger. Null when nothing is recorded. */
+async function measuredDailyCostUsd(): Promise<number | null> {
+  const { data, error } = await db.rpc('measured_daily_cost_usd', { window_days: 7 });
+  if (error || data === null || data === undefined) return null;
+  const n = Number(data);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Measured from two on-chain timestamps, not estimated. */

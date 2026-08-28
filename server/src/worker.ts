@@ -141,7 +141,7 @@ async function workOne(): Promise<void> {
   log('running', order.id, order.service_id);
 
   try {
-    const body = await runJob(order.service_id, order.input);
+    const body = await runJob(order.service_id, order.input, order.id);
     const { signature, hash } = await writeReceipt(order.id, body);
 
     await db.from('reports').upsert({ order_id: order.id, body });
