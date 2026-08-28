@@ -24,8 +24,9 @@ function Detail({
   const priv = JOB_PRIVATE[job.id] as (typeof JOB_PRIVATE)[string] | undefined
   const canReveal = !live && !!priv
   const shown = unlocked && canReveal
-  /** terminal states that will never produce a delivery or a receipt */
-  const ended = job.status === 'refunded' || job.status === 'expired'
+  /** the server tells us whether a report/receipt is still coming — we do not
+   *  enumerate statuses, so a new terminal status needs no change here */
+  const ended = !job.awaitingDelivery && job.status !== 'delivered'
 
   return (
     <div>
@@ -205,7 +206,7 @@ export default function Jobs({ jobId, openJob }: Props) {
                 </td>
                 <td className="pay">{j.paidAt}</td>
                 <td
-                  className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : ''}`}
+                  className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : j.terminal ? ' ref' : ''}`}
                 >
                   {j.status}
                 </td>

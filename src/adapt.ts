@@ -41,6 +41,9 @@ export const adaptQueueRow = (q: QueueResponse): Job => ({
   // both confirmed present by running scripts/contract.ts against the live
   // server — an observation of the code, not a claim about it
   etaDeadline: clock(q.etaDeadline),
+  // the server answers 'will this ever arrive?' so the UI never has to infer it
+  awaitingDelivery: q.awaitingDelivery,
+  terminal: q.terminal,
   deliveredAt: clock(q.deliveredAt),
   createdAt: clock(q.createdAt) ?? '—',
   paidAt: clock(q.paidAt) ?? '—',

@@ -24,6 +24,7 @@ app.get('/api/status', async (c) => {
     counts,
     turnaround,
     measuredCost,
+    spend,
     liability,
     deliveredCount,
   ] = await Promise.all([
@@ -40,6 +41,7 @@ app.get('/api/status', async (c) => {
       .in('status', ['paid', 'running']),
     medianTurnaroundMinutes(),
     measuredDailyCostUsd(),
+    observedSpend(),
     db.from('orders').select('amount_lamports').in('status', ['paid', 'running']),
     db
       .from('orders')
@@ -71,9 +73,15 @@ app.get('/api/status', async (c) => {
 
     /** Config constant. An assumption, not an observation. */
     dailyCostUsd: declaredCostUsd,
-    /** Observed from the costs ledger over a trailing window. Null until there
-     *  is spend to measure. */
+    /** Observed daily RATE. Null until the ledger holds enough observations
+     *  over enough time to actually be a rate — one job's cost divided by a
+     *  one-day floor is an extrapolation, not a measurement. */
     measuredDailyCostUsd: measuredCost,
+
+    /** Raw partial spend. Always available, explicitly NOT a daily rate, and
+     *  a LOWER BOUND: it covers only the kinds written to the ledger, which
+     *  today is inference alone. RPC and network fees are real and untracked. */
+    observedSpend: spend,
     /** 'measured' | 'declared' — which figure runwayDays actually used.
      *  The UI must not call runway "measured" unless this says so. */
     dailyCostBasis: basis,
@@ -453,12 +461,45 @@ async function solPriceUsd(): Promise<number | null> {
   }
 }
 
-/** Observed spend per day from the costs ledger. Null when nothing is recorded. */
+/**
+ * Observed spend per DAY. Null until the ledger holds enough observations,
+ * spanning enough time, to be a rate rather than an extrapolation from a
+ * handful of seconds. Null makes the caller fall back to declared and say so.
+ */
 async function measuredDailyCostUsd(): Promise<number | null> {
   const { data, error } = await db.rpc('measured_daily_cost_usd', { window_days: 7 });
   if (error || data === null || data === undefined) return null;
   const n = Number(data);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * The raw partial figure — always available, explicitly not a daily rate.
+ *
+ * IMPORTANT: this covers only the cost kinds actually written to the ledger,
+ * which today is inference alone. RPC and network fees are real costs and are
+ * NOT tracked yet, so this is a LOWER BOUND on what the agent spends, never
+ * the total.
+ */
+async function observedSpend(): Promise<{
+  totalUsd: number;
+  sampleCount: number;
+  hoursObserved: number;
+  coversKinds: string[];
+  isLowerBound: boolean;
+}> {
+  const { data } = await db.rpc('observed_spend', { window_days: 7 });
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { total_usd: number; sample_count: number; hours_observed: number }
+    | undefined;
+
+  return {
+    totalUsd: Number(row?.total_usd ?? 0),
+    sampleCount: Number(row?.sample_count ?? 0),
+    hoursObserved: Number(row?.hours_observed ?? 0),
+    coversKinds: ['inference'],
+    isLowerBound: true,
+  };
 }
 
 /** Measured from two on-chain timestamps, not estimated. */

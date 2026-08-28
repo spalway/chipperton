@@ -82,6 +82,17 @@ export type QueueResponse = {
   etaBasis: CostBasisField
   /** Committed at settle and immutable — what a refund is owed against. */
   etaDeadline: string | null
+  /** Nothing about this order will change again — safe to stop polling. */
+  terminal: boolean
+  /**
+   * Whether a report and receipt are still expected.
+   *
+   * This is what disambiguates a null. A refunded order and a queued order both
+   * send `receiptSig: null` — identical payload, opposite meanings ("never" vs
+   * "not yet"). Ask this field instead of enumerating statuses per nullable
+   * field, which is how "on delivery" ended up on a refunded job.
+   */
+  awaitingDelivery: boolean
   deliveredAt: string | null
   paymentSig: string | null
   receiptSig: string | null

@@ -282,6 +282,13 @@ export type Job = {
   etaMinutes: number | null
   /** committed at settle and immutable — the deadline a refund is owed against */
   etaDeadline: string | null
+  /**
+   * Whether a report/receipt is still coming. Drives every "on delivery" vs
+   * "none — refunded" label, so a new terminal status needs no frontend change.
+   */
+  awaitingDelivery: boolean
+  /** nothing about this row will change again */
+  terminal: boolean
   deliveredAt: string | null
   createdAt: string
   /** on-chain blockTime of the payment tx */
@@ -302,43 +309,43 @@ export type JobPrivate = {
 export const JOBS: Job[] = [
   {
     id: '#0412', service: 'Token safety check', payer: '$CHIPS', amountUsd: 5.4, chips: true,
-    status: 'running', etaMinutes: 3, etaDeadline: '12:12', deliveredAt: null,
+    status: 'running', awaitingDelivery: true, terminal: false, etaMinutes: 3, etaDeadline: '12:12', deliveredAt: null,
     createdAt: '12:04:11', paidAt: '12:04:33', paymentSig: '5xQ2…mb3z',
     receiptSig: null, reportHash: null,
   },
   {
     id: '#0411', service: 'Transaction trace', payer: 'USDC', amountUsd: 9, chips: false,
-    status: 'queued', etaMinutes: 23, etaDeadline: '12:12', deliveredAt: null,
+    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 23, etaDeadline: '12:12', deliveredAt: null,
     createdAt: '11:51:50', paidAt: '11:52:18', paymentSig: '7bTn…Lp4w',
     receiptSig: null, reportHash: null,
   },
   {
     id: '#0410', service: 'Wallet activity report', payer: '$CHIPS', amountUsd: 3.6, chips: true,
-    status: 'queued', etaMinutes: 35, etaDeadline: '11:10', deliveredAt: null,
+    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 35, etaDeadline: '11:10', deliveredAt: null,
     createdAt: '10:57:44', paidAt: '10:58:12', paymentSig: '8mCd…Yu2p',
     receiptSig: null, reportHash: null,
   },
   {
     id: '#0409', service: 'Bundle / cluster detection', payer: 'SOL', amountUsd: 12, chips: false,
-    status: 'queued', etaMinutes: 60, etaDeadline: '10:28', deliveredAt: null,
+    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 60, etaDeadline: '10:28', deliveredAt: null,
     createdAt: '10:02:51', paidAt: '10:03:19', paymentSig: '6Vb2…Ax5j',
     receiptSig: null, reportHash: null,
   },
   {
     id: '#0408', service: 'Program IDL brief', payer: '$CHIPS', amountUsd: 7.2, chips: true,
-    status: 'delivered', etaMinutes: null, etaDeadline: '11:06', deliveredAt: '11:04',
+    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '11:06', deliveredAt: '11:04',
     createdAt: '10:47:39', paidAt: '10:48:11', paymentSig: '2Hx9…Rt6v',
     receiptSig: '2Hx9…Rt6v', reportHash: 'a4f9c118…7e21',
   },
   {
     id: '#0407', service: 'Token safety check', payer: 'SOL', amountUsd: 6, chips: false,
-    status: 'delivered', etaMinutes: null, etaDeadline: '10:42', deliveredAt: '10:41',
+    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '10:42', deliveredAt: '10:41',
     createdAt: '10:33:30', paidAt: '10:34:02', paymentSig: '1Pw4…Gh8n',
     receiptSig: '4Nq7…Zk9s', reportHash: 'c2b7e04d…9f13',
   },
   {
     id: '#0406', service: 'Watchlist digest', payer: '$CHIPS', amountUsd: 13.5, chips: true,
-    status: 'delivered', etaMinutes: null, etaDeadline: '09:14', deliveredAt: '09:00',
+    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '09:14', deliveredAt: '09:00',
     createdAt: '08:13:58', paidAt: '08:14:22', paymentSig: '3Rk8…Bn2f',
     receiptSig: '5Tz6…Kv1c', reportHash: '77d1a35b…4c08',
   },
