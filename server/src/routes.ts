@@ -9,6 +9,7 @@ import {
   explorerAddress,
   explorerTx,
   explorerTxOrNull,
+  solscanTx,
   rpcPay,
   vaultAddress,
 } from './chain/clients.ts';
@@ -474,7 +475,9 @@ app.get('/api/reports/:id', async (c) => {
     /** The report as published on Solana, in order. Concatenate each memo
      *  after its `chp:1:rpt:<id>:<i>/<n>:` prefix to rebuild the body. */
     chunkSigs,
+    /** Solana Explorer — renders the memo text. Solscan does not decode it. */
     chunkUrls: chunkSigs.map((s) => explorerTx(s)),
+    chunkUrlsSolscan: chunkSigs.map((s) => solscanTx(s)),
     verify:
       'sha256 the report body and take the first 16 hex characters; it must ' +
       'equal reportHash, which is also in the receipt memo on-chain.',

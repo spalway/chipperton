@@ -64,10 +64,28 @@ function clusterQuery(): string {
   return config.payCluster === 'mainnet-beta' ? '' : `?cluster=${config.payCluster}`;
 }
 
+/**
+ * Primary transaction link: the OFFICIAL Solana Explorer, not Solscan.
+ *
+ * Solscan does not decode SPL Memo instruction data. It renders our report
+ * chunks as "Memo Program V2: Unknown" and the memo text appears nowhere on
+ * the page — verified against a live chunk transaction. Since the entire point
+ * of publishing reports on-chain is that a stranger can read them, linking to
+ * an explorer that hides the payload defeats the feature.
+ *
+ * explorer.solana.com renders the full memo text inline.
+ */
 export function explorerTx(signature: string): string {
+  const q = config.payCluster === 'mainnet-beta' ? '' : `?cluster=${config.payCluster}`;
+  return `https://explorer.solana.com/tx/${signature}${q}`;
+}
+
+/** Secondary link, for people who prefer Solscan's balance/token views. */
+export function solscanTx(signature: string): string {
   return `https://solscan.io/tx/${signature}${clusterQuery()}`;
 }
 
+/** Accounts are fine on Solscan — balances and history render properly there. */
 export function explorerAddress(addr: string): string {
   return `https://solscan.io/account/${addr}${clusterQuery()}`;
 }
