@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { address } from '@solana/kit';
-import { REFUND_FEE_BUFFER, chipsEnabled, config, corsOrigins } from './config.ts';
+import { REFUND_FEE_BUFFER, config, corsOrigins } from './config.ts';
 import { rateLimit } from './ratelimit.ts';
 import { db, type Order, type Service } from './db.ts';
 import {
@@ -86,6 +86,11 @@ app.get('/api/status', async (c) => {
       .gte('delivered_at', startOfDay.toISOString()),
   ]);
 
+  // Empty string in the column is treated as unset — a blank is far likelier
+  // to be someone clearing the field than a deliberate value.
+  const chipsMint = (state.data?.chips_mint || null) as string | null;
+  const twitterHandle = (state.data?.twitter_handle || null) as string | null;
+
   const refundLiability = (liability.data ?? []).reduce(
     (sum, o) => sum + Number(o.amount_lamports),
     0,
@@ -147,7 +152,22 @@ app.get('/api/status', async (c) => {
     nextTickAt: lastTickAt ? new Date(Date.parse(lastTickAt) + interval * 1000).toISOString() : null,
     medianTurnaroundMinutes: turnaround,
     payCluster: config.payCluster,
-    chipsEnabled,
+
+    /* ---- live settings ------------------------------------------------
+     * Read from agent_state, which this handler already fetches — so these
+     * change the moment the row changes, with no redeploy. That matters for
+     * the mint especially: the address exists the second the token launches,
+     * and waiting on a Railway rebuild to show it is the wrong shape.
+     *
+     * NULL mint means not launched. chipsEnabled is DERIVED from it rather
+     * than being a separate flag that could disagree. */
+    chipsMint,
+    chipsUrl: chipsMint ? `https://pump.fun/coin/${chipsMint}` : null,
+    chipsEnabled: chipsMint !== null,
+    chipsDiscountPct: config.chipsDiscountPct,
+
+    twitterHandle,
+    twitterUrl: twitterHandle ? `https://x.com/${twitterHandle}` : null,
   });
 });
 
@@ -373,7 +393,11 @@ app.post('/api/orders', async (c) => {
   }
 
   const currency = (body.currency ?? 'SOL').toUpperCase();
-  if (currency === 'CHIPS' && !chipsEnabled) {
+  // Read the live setting, not the env var — otherwise the shop could offer
+  // CHIPS the moment the mint is set in the database while this path kept
+  // rejecting it until a redeploy.
+  const liveChipsMint = await chipsMintSetting();
+  if (currency === 'CHIPS' && liveChipsMint === null) {
     return c.json(
       { error: 'CHIPS payment is not available yet — the token has not launched.' },
       409,
@@ -611,6 +635,23 @@ app.get('/api/orders/:id', async (c) => {
 });
 
 /* ------------------------------------------------------------------ helpers */
+
+/**
+ * The $CHIPS mint, from the database rather than config, so launching the
+ * token is a single UPDATE and takes effect on the next request.
+ *
+ * Cached briefly: this is read on every order attempt, and a launch-day value
+ * being up to five seconds stale is fine while a database round trip per
+ * order is not.
+ */
+let chipsCache: { at: number; mint: string | null } = { at: 0, mint: null };
+
+async function chipsMintSetting(): Promise<string | null> {
+  if (Date.now() - chipsCache.at < 5_000) return chipsCache.mint;
+  const { data } = await db.from('agent_state').select('chips_mint').eq('id', 1).single();
+  chipsCache = { at: Date.now(), mint: (data?.chips_mint || null) as string | null };
+  return chipsCache.mint;
+}
 
 async function serviceMap(): Promise<Map<string, Service>> {
   const { data } = await db.from('services').select('*');
