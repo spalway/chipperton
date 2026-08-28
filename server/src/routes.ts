@@ -125,7 +125,18 @@ app.get('/api/status', async (c) => {
   const vaultLamports = Number(balance);
   const vaultUsd = solUsd === null ? null : (vaultLamports / LAMPORTS_PER_SOL) * solUsd;
   const declaredCostUsd = Number(state.data?.daily_cost_usd ?? config.dailyCostUsd);
-  const interval = Number(state.data?.tick_interval_seconds ?? config.tickIntervalSeconds);
+  /*
+   * Report the interval the WORKER actually uses, which is the env value —
+   * its setInterval is built from config at boot and nothing rereads the
+   * database. Preferring agent_state here created exactly one bug: the column
+   * said 900 while the loop ran every 60s, so the site advertised "reviews
+   * every 15 min" for an agent that reviews every minute.
+   *
+   * The column cannot be authoritative without the worker rereading it, and
+   * a value that only takes effect on restart should not look live. So env
+   * wins and the column is descriptive only.
+   */
+  const interval = config.tickIntervalSeconds;
   const lastTickAt = state.data?.last_tick_at ?? null;
 
   // Prefer what the agent has actually been observed spending. Fall back to the
