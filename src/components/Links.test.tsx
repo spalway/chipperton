@@ -37,8 +37,9 @@ const BASE = {
   chipsDiscountPct: 10,
   twitterHandle: null as string | null,
   twitterUrl: null as string | null,
-  vaultUrl: null,
-  hotWalletUrl: null,
+  // widened, not literal null — overrides supply real URLs in the live cases
+  vaultUrl: null as string | null,
+  hotWalletUrl: null as string | null,
 }
 
 const MINT = 'BvSTr4pMintExample11111111111111111111111111'
@@ -191,5 +192,83 @@ describe('agenda — derived, and empty means done', () => {
     expect(document.querySelector('.tg.ag-blocked')).not.toBeNull()
     expect(document.querySelector('.tg.ag-waiting')).not.toBeNull()
     expect(screen.getByText(/clears when funded/)).toBeInTheDocument()
+  })
+})
+
+describe('the two wallet links', () => {
+  const mountOverview = async (overrides: Partial<typeof BASE> = {}) => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_URL', 'https://api.example')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const body = url.includes('/api/status') ? { ...BASE, ...overrides } : []
+        const headers = new Headers({ 'X-Queue-Total': '0', 'X-Queue-Limit': '25' })
+        return { ok: true, headers, json: async () => body } as Response
+      }),
+    )
+    const [{ default: Overview }, { default: WalletProvider }, { default: LiveDataProvider }] =
+      await Promise.all([
+        import('../pages/Overview'),
+        import('../WalletProvider'),
+        import('../LiveDataProvider'),
+      ])
+    render(
+      <LiveDataProvider>
+        <WalletProvider>
+          <Overview go={() => {}} openJob={() => {}} />
+        </WalletProvider>
+      </LiveDataProvider>,
+    )
+  }
+
+  const LIVE = {
+    vaultAddress: 'VAULTaddr1111111111111111111111111111111111',
+    vaultUrl: 'https://solscan.io/account/VAULTaddr1111111111111111111111111111111111',
+    hotWalletAddress: 'HOTaddr111111111111111111111111111111111111',
+    hotWalletUrl: 'https://solscan.io/account/HOTaddr111111111111111111111111111111111111',
+  }
+
+  it('renders both, bracketed and named', async () => {
+    await mountOverview(LIVE)
+    expect(await screen.findByText('[hot] ↗')).toHaveAttribute('href', LIVE.hotWalletUrl)
+    expect(screen.getByText('[vault] ↗')).toHaveAttribute('href', LIVE.vaultUrl)
+  })
+
+  it('says which wallet is which, since they are not interchangeable', async () => {
+    await mountOverview(LIVE)
+    const hot = await screen.findByText('[hot] ↗')
+    // the asymmetry is the point: thin on purpose, and what refunds come from
+    expect(hot.getAttribute('title')).toMatch(/refunds/)
+    expect(hot.getAttribute('title')).toContain(LIVE.hotWalletAddress)
+    expect(screen.getByText('[vault] ↗').getAttribute('title')).toMatch(/every payment/)
+  })
+
+  it('renders neither in sample mode rather than inert labels', async () => {
+    // a bracketed [vault] with no href is a placeholder wearing a link's clothes
+    vi.resetModules()
+    vi.stubEnv('VITE_API_URL', '')
+    const [{ default: Overview }, { default: WalletProvider }, { default: LiveDataProvider }] =
+      await Promise.all([
+        import('../pages/Overview'),
+        import('../WalletProvider'),
+        import('../LiveDataProvider'),
+      ])
+    render(
+      <LiveDataProvider>
+        <WalletProvider>
+          <Overview go={() => {}} openJob={() => {}} />
+        </WalletProvider>
+      </LiveDataProvider>,
+    )
+    await waitFor(() => expect(screen.queryByText('[vault] ↗')).toBeNull())
+    expect(screen.queryByText('[hot] ↗')).toBeNull()
+  })
+
+  it('shows one wallet when only one is reported', async () => {
+    // gated separately, so a missing hot url does not hide the vault
+    await mountOverview({ ...LIVE, hotWalletUrl: null })
+    expect(await screen.findByText('[vault] ↗')).toBeInTheDocument()
+    expect(screen.queryByText('[hot] ↗')).toBeNull()
   })
 })

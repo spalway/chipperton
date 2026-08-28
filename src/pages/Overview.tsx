@@ -12,7 +12,6 @@ import {
 import Motto from '../components/Motto'
 import Status from '../components/Status'
 import { useResolved } from '../useLiveData'
-import { short } from '../wallet'
 
 const LINKS: { view: View; label: string; promo: string; green?: boolean }[] = [
   { view: 'shop', label: "chip's shop →", promo: '10% off if you pay with chips', green: true },
@@ -47,21 +46,31 @@ export default function Overview({ go, openJob }: Props) {
         <div>
           <div className="titlerow">
             <h1>{AGENT.name}</h1>
-            {/* Was an "agent registry →" link with a dead href, promising a
-                registry entry that was never created. The wallet is the thing
-                that actually exists and can be checked, so it is what we link. */}
-            {/* Nothing at all when there is no live status: in sample mode we do
-                not have the agent's real address, and a placeholder one would be
-                the same lie in a different font. */}
+            {/* Replaced an "agent registry →" link with a dead href. Each wallet
+                is gated on its OWN url and address: in sample mode we do not
+                have real ones, and a placeholder address would be the same lie
+                in a different font. Gated separately so one missing does not
+                hide the other. */}
+            {status?.hotWalletUrl && status.hotWalletAddress && (
+              <a
+                className="wal hot"
+                href={status.hotWalletUrl}
+                target="_blank"
+                rel="noreferrer"
+                title={`Hot wallet ${status.hotWalletAddress} — signs receipts and report chunks and pays refunds. Kept deliberately thin, so a compromised worker costs the float rather than the treasury.`}
+              >
+                [hot] ↗
+              </a>
+            )}
             {status?.vaultUrl && status.vaultAddress && (
               <a
-                className="registry"
+                className="wal vault"
                 href={status.vaultUrl}
                 target="_blank"
                 rel="noreferrer"
-                title={status.vaultAddress}
+                title={`Vault ${status.vaultAddress} — receives every payment. Runway is computed from this balance.`}
               >
-                {short(status.vaultAddress, 4, 4)} ↗
+                [vault] ↗
               </a>
             )}
           </div>

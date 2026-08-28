@@ -90,6 +90,18 @@ export default function Docs({ go }: { go: (v: View) => void }) {
           the funds</b> — there is no on-chain program constraining that today. The spend cap and
           allowed actions below are enforced by the worker, not by Solana.
         </p>
+        <p>
+          There are <b>two</b> wallets, and they do different jobs. The <b>vault</b> receives
+          every payment and is what runway is computed from. The <b>hot wallet</b> signs receipts
+          and report chunks and pays refunds, and is kept deliberately thin — so a compromised
+          worker costs the float rather than the treasury. Both are linked at the top of the
+          front page.
+        </p>
+        <p>
+          That split is why the shop closes on the <i>hot</i> balance rather than the vault:
+          money sitting in the vault does not help it refund anyone. A full treasury and an
+          empty refund wallet still means it will not sell.
+        </p>
 
         <h4 id="d-rules">Operating rules</h4>
         <p>
