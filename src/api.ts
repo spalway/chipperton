@@ -57,7 +57,10 @@ export type StatusResponse = {
   tickIntervalSeconds: number
   /** Scheduled, not guaranteed — the worker is best-effort cron. */
   nextTickAt: string | null
+  /** LOSSY. Prefer medianTurnaroundSeconds — minutes cannot express 25 sec. */
   medianTurnaroundMinutes: number | null
+  /** Finest unit available. Optional until the server reporting it is deployed. */
+  medianTurnaroundSeconds?: number | null
   /** Cluster payments settle on. Research jobs read mainnet regardless. */
   payCluster: string
   /**
@@ -146,8 +149,10 @@ export type QueueResponse = {
   amountUsd: number | null
   createdAt: string
   paidAt: string | null
-  /** Live estimate — moves as the queue drains. */
+  /** LOSSY. Prefer etaSeconds. */
   etaMinutes: number | null
+  /** Live estimate in seconds — lets the label pick its own unit. */
+  etaSeconds?: number | null
   etaBasis: CostBasisField
   /** Committed at settle and immutable — what a refund is owed against. */
   etaDeadline: string | null

@@ -44,6 +44,8 @@ export const adaptQueueRow = (q: QueueResponse): Job => ({
   // 'queued' would tell a buyer their job is pending when they were repaid
   status: q.status,
   etaMinutes: q.etaMinutes,
+  // preferred over etaMinutes wherever present — minutes are already rounded
+  etaSeconds: q.etaSeconds,
   // read, not just carried: this flips to 'measured' on the first delivery and
   // the label above the number has to change with it
   etaBasis: q.etaBasis,

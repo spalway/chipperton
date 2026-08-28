@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { JOB_PRIVATE, etaBasisNote, sol, usdApprox, type Job, type View } from '../data'
+import { JOB_PRIVATE, etaBasisNote, etaText, sol, usdApprox, type Job, type View } from '../data'
 import { useResolved } from '../useLiveData'
 import { useReport } from '../useReport'
 
@@ -100,7 +100,7 @@ function Detail({
             ? job.status
             : job.etaMinutes == null
               ? job.status
-              : `${job.status} · ~${job.etaMinutes} min${job.status === 'running' ? ' left' : ''}`}
+              : `${job.status} · ~${etaText(job)}${job.status === 'running' ? ' left' : ''}`}
       </p>
 
       <div className="jobgrid">
@@ -147,7 +147,7 @@ function Detail({
               <span className="mut">refunded — no longer queued</span>
             ) : job.etaMinutes != null ? (
               <>
-                ~{job.etaMinutes} min
+                ~{etaText(job)}
                 {/* the server says whether this is a target or an observation;
                     the number alone cannot distinguish them */}
                 <div className="basis">{etaBasisNote(job.etaBasis)}</div>

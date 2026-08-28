@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chipsPriceSol, dueLabel, intervalLabel, sol, usdApprox } from './data'
+import { chipsPriceSol, dueLabel, durationLabel, etaText, intervalLabel, sol, turnaroundLabel, usdApprox } from './data'
 import {
   COST_LINES,
   DAILY_COST_USD,
@@ -237,5 +237,57 @@ describe('dueLabel — sub-minute countdowns after the tick dropped to 60s', () 
 
   it('returns nothing rather than a fake countdown for a bad timestamp', () => {
     expect(dueLabel(Number.NaN)).toBeNull()
+  })
+})
+
+describe('durationLabel — one ladder, fed seconds', () => {
+  it('keeps a sub-minute duration in seconds', () => {
+    // 0.42 min was the raw float that shipped; 25 sec is what it means
+    expect(durationLabel(25)).toBe('25 sec')
+    expect(durationLabel(59)).toBe('59 sec')
+  })
+
+  it('closes the gap I previously left open at the top end', () => {
+    // etaMinutes rendered "1440 min" for a day-deep queue because minutes were
+    // chosen before the value reached the formatter.
+    expect(durationLabel(86_400)).toBe('1 d')
+    expect(durationLabel(3_600)).toBe('1.0 h')
+    expect(durationLabel(7_200)).toBe('2.0 h')
+  })
+
+  it('uses minutes in between, at human precision', () => {
+    expect(durationLabel(90)).toBe('1.5 min')
+    expect(durationLabel(480)).toBe('8.0 min')
+    expect(durationLabel(1_500)).toBe('25 min')
+  })
+
+  it('returns a dash rather than a fake duration for nonsense', () => {
+    expect(durationLabel(Number.NaN)).toBe('—')
+    expect(durationLabel(-5)).toBe('—')
+  })
+
+  it('turnaroundLabel is the same ladder, fed minutes', () => {
+    // kept for the sample ledger and the API's lossy *Minutes fields
+    expect(turnaroundLabel(0.42136666666666667)).toBe(durationLabel(0.42136666666666667 * 60))
+    expect(turnaroundLabel(0.42136666666666667)).toBe('25 sec')
+  })
+})
+
+describe('etaText prefers seconds over the rounded minutes field', () => {
+  it('uses etaSeconds when the server sends it', () => {
+    expect(etaText({ etaSeconds: 45, etaMinutes: 1 })).toBe('45 sec')
+  })
+
+  it('falls back to minutes when it does not — so it works before that deploy', () => {
+    expect(etaText({ etaMinutes: 8 })).toBe('8.0 min')
+  })
+
+  it('does not render "0 min" for a job about to start', () => {
+    // the exact failure that made minutes unrecoverable at the bottom end
+    expect(etaText({ etaSeconds: 12, etaMinutes: 0 })).toBe('12 sec')
+  })
+
+  it('shows a dash when there is no estimate at all', () => {
+    expect(etaText({ etaSeconds: null, etaMinutes: null })).toBe('—')
   })
 })

@@ -2,6 +2,7 @@ import {
   AGENT,
   COST_BASIS,
   dueLabel,
+  durationLabel,
   intervalLabel,
   TREASURY,
   openJobs,
@@ -39,6 +40,16 @@ export default function Status({ go, openJob }: Props) {
   const tick = useCountdown(AGENT.reviewMinutes, s?.nextTickAt ?? null)
   const nextIn = s ? secondsUntil(s.nextTickAt) : null
   const due = nextIn == null ? null : dueLabel(nextIn)
+  /* Seconds when the server reports them, minutes otherwise. Minutes cannot
+     express a 25-second turnaround — that lossiness is where "0 min" came
+     from — so the finer field wins wherever it exists. */
+  const turnaroundText = !s
+    ? null
+    : s.medianTurnaroundSeconds != null
+      ? `${durationLabel(s.medianTurnaroundSeconds)} median turnaround, measured`
+      : s.medianTurnaroundMinutes != null
+        ? `${turnaroundLabel(s.medianTurnaroundMinutes)} median turnaround, measured`
+        : null
 
   const link = (v: View, label: string, tone: string, onClick?: () => void) => (
     <a
@@ -91,9 +102,7 @@ export default function Status({ go, openJob }: Props) {
             {s.backlog} job{s.backlog === 1 ? '' : 's'}
           </div>
           <div className="s">
-            {s.medianTurnaroundMinutes == null
-              ? 'nothing delivered yet'
-              : `${turnaroundLabel(s.medianTurnaroundMinutes)} median turnaround, measured`}
+            {turnaroundText ?? 'nothing delivered yet'}
           </div>
           {link('jobs', 'the queue →', 'blue', () => openJob?.(null))}
         </div>

@@ -144,15 +144,30 @@ export const COST_LINES: CostLine[] = [
 export const costTotal = () => COST_LINES.reduce((a, c) => a + c.usd, 0)
 
 /**
- * Turnaround comes off the wire as a raw float of minutes (0.4213666… for a
- * 25-second job). Render it at human precision, and in seconds below a minute —
- * "0 min" would read as instant and "0.42 min" reads as a machine leaking.
+ * A duration, given in SECONDS, choosing its own unit.
+ *
+ * Seconds is the input because every formatting bug we have had came from
+ * rounding to a coarser unit before formatting: 0.42 min, 60/60, 20/60. Once a
+ * value arrives already in minutes, "0 min" for a 25-second job and "1440 min"
+ * for a deep queue are both unrecoverable — the range the formatter needed is
+ * gone. Take the finest unit available and decide here.
  */
-export const turnaroundLabel = (mins: number) => {
-  if (mins < 1) return `${Math.round(mins * 60)} sec`
-  if (mins < 10) return `${mins.toFixed(1)} min`
-  return `${Math.round(mins)} min`
+export const durationLabel = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds < 0) return '—'
+  if (seconds < 60) return `${Math.round(seconds)} sec`
+  const mins = seconds / 60
+  if (mins < 60) return mins < 10 ? `${mins.toFixed(1)} min` : `${Math.round(mins)} min`
+  const hours = mins / 60
+  if (hours < 24) return hours < 10 ? `${hours.toFixed(1)} h` : `${Math.round(hours)} h`
+  return `${Math.round(hours / 24)} d`
 }
+
+/**
+ * Same ladder, for the places that only have minutes — the sample ledger, and
+ * the live API's lossy `*Minutes` fields before its `*Seconds` ones land.
+ * Prefer seconds wherever both exist.
+ */
+export const turnaroundLabel = (mins: number) => durationLabel(mins * 60)
 
 /**
  * A tick interval, phrased to follow the word "every".
@@ -200,6 +215,20 @@ export const dueLabel = (seconds: number): string | null => {
  *
  * This flips on the FIRST delivered job, with nothing for anyone to deploy.
  */
+/**
+ * A job's estimate, using the finest unit the server gave us.
+ *
+ * `${etaMinutes} min` renders "0 min" for a job about to start and "1440 min"
+ * for a deep queue — both unrecoverable, because minutes were chosen before
+ * the value reached us. `etaSeconds` lets the ladder decide.
+ */
+export const etaText = (j: { etaSeconds?: number | null; etaMinutes: number | null }) =>
+  j.etaSeconds != null
+    ? durationLabel(j.etaSeconds)
+    : j.etaMinutes != null
+      ? durationLabel(j.etaMinutes * 60)
+      : '—'
+
 export const etaBasisNote = (basis: CostBasis) =>
   basis === 'measured'
     ? 'measured — from jobs already delivered'
@@ -458,6 +487,8 @@ export type Job = {
   status: 'running' | 'queued' | 'delivered' | 'refunded' | 'expired'
   /** live estimate — queuePosition × median service minutes, moves as the queue drains */
   etaMinutes: number | null
+  /** the same estimate unrounded, when the server reports it */
+  etaSeconds?: number | null
   /**
    * Whether that estimate is a configured guess or derived from delivered work.
    *

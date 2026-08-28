@@ -1,6 +1,7 @@
 import {
   AGENT,
   etaBasisNote,
+  etaText,
   intervalLabel,
   runwayDays,
   sol,
@@ -182,9 +183,7 @@ export default function Overview({ go, openJob }: Props) {
                         ? j.deliveredAt
                         : !j.awaitingDelivery
                           ? 'repaid'
-                          : j.etaMinutes != null
-                            ? `${j.etaMinutes} min`
-                            : '—'}
+                          : etaText(j)}
                     </span>
                   </div>
                 </div>

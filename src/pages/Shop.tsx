@@ -4,7 +4,7 @@ import {
   chipsPriceSol,
   measuredTurnaroundMins,
   sol,
-  turnaroundLabel,
+  durationLabel,
   usdApprox,
   type Service,
 } from '../data'
@@ -48,7 +48,15 @@ export default function Shop() {
   const [payWith, setPayWith] = useState<'chips' | 'sol'>('chips')
   const pay = chipsEnabled ? payWith : 'sol'
   const backlog = status ? status.backlog : queue.filter((j) => j.status !== 'delivered').length
-  const turnaround = isLive ? status?.medianTurnaroundMinutes ?? null : measuredTurnaroundMins()
+  // in seconds throughout, so the label picks its own unit — a 25-second
+  // median cannot survive a trip through minutes
+  const sampleTurnaround = measuredTurnaroundMins()
+  const turnaroundSecs = isLive
+    ? (status?.medianTurnaroundSeconds ??
+      (status?.medianTurnaroundMinutes != null ? status.medianTurnaroundMinutes * 60 : null))
+    : sampleTurnaround != null
+      ? sampleTurnaround * 60
+      : null
 
   return (
     <div>
@@ -122,7 +130,7 @@ export default function Shop() {
           </h2>
           <span className="meta">
             backlog {backlog} job{backlog === 1 ? '' : 's'}
-            {turnaround ? ` · ${turnaroundLabel(turnaround)} median turnaround, measured` : ''}
+            {turnaroundSecs ? ` · ${durationLabel(turnaroundSecs)} median turnaround, measured` : ''}
           </span>
         </div>
         <div className="shop">
