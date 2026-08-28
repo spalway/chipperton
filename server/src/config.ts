@@ -66,3 +66,11 @@ export const config = {
 } as const;
 
 export const chipsEnabled = config.chipsMint.length > 0;
+
+/**
+ * Headroom the hot wallet keeps on top of outstanding refund liability, to
+ * cover the signature fees the refunds themselves cost. Shared by the worker's
+ * accept-work gate and the solvency figure on /api/status so the two can never
+ * disagree about whether the agent is solvent.
+ */
+export const REFUND_FEE_BUFFER = 10_000_000; // ~0.01 SOL

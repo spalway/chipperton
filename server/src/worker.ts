@@ -1,4 +1,4 @@
-import { config } from './config.ts';
+import { REFUND_FEE_BUFFER, config } from './config.ts';
 import { db, type Order } from './db.ts';
 import { agentSigner, rpcPay } from './chain/clients.ts';
 import { sendRefund, writeReceipt } from './chain/receipt.ts';
@@ -132,7 +132,7 @@ async function canCoverRefunds(): Promise<boolean> {
     .in('status', ['paid', 'running']);
 
   const owed = (data ?? []).reduce((sum, o) => sum + Number(o.amount_lamports), 0);
-  const feeBuffer = 10_000_000; // ~0.01 SOL for signatures
+  const feeBuffer = REFUND_FEE_BUFFER;
   const { value: balance } = await rpcPay.getBalance(agentSigner.address).send();
 
   if (Number(balance) >= owed + feeBuffer) return true;

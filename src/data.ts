@@ -277,7 +277,7 @@ export type Job = {
   payer: string
   amountUsd: number
   chips: boolean
-  status: 'running' | 'queued' | 'delivered'
+  status: 'running' | 'queued' | 'delivered' | 'refunded' | 'expired'
   /** live estimate — queuePosition × median service minutes, moves as the queue drains */
   etaMinutes: number | null
   /** committed at settle and immutable — the deadline a refund is owed against */

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { chipsPrice, measuredTurnaroundMins, openJobs } from '../data'
+import { chipsPrice, measuredTurnaroundMins, usd } from '../data'
 import { useResolved } from '../useLiveData'
 import Motto from '../components/Motto'
 
@@ -51,15 +51,17 @@ export default function Shop() {
         </div>
         <div className="stats" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <div
-            className={`opt${payWith === 'chips' ? ' on' : ''}`}
-            onClick={() => setPayWith('chips')}
+            className={`opt${pay === 'chips' ? ' on' : ''}${chipsEnabled ? '' : ' soon'}`}
+            onClick={() => chipsEnabled && setPayWith('chips')}
           >
             <div className="l">
-              $CHIPS<s>token holders</s>
+              $CHIPS<s>{chipsEnabled ? 'token holders' : 'not available until the token launches'}</s>
             </div>
-            <span className="off">−10%</span>
+            <span className={chipsEnabled ? 'off' : 'soonchip'}>
+              {chipsEnabled ? '−10%' : 'soon'}
+            </span>
           </div>
-          <div className={`opt${payWith === 'sol' ? ' on' : ''}`} onClick={() => setPayWith('sol')}>
+          <div className={`opt${pay === 'sol' ? ' on' : ''}`} onClick={() => setPayWith('sol')}>
             <div className="l">
               SOL or USDC<s>list price</s>
             </div>
@@ -87,8 +89,9 @@ export default function Shop() {
               <div className="top">
                 <span className="n">{s.name}</span>
                 <span className="pz">
-                  ${s.price}
-                  {s.active && <s>{chipsPrice(s.price)} in chips</s>}
+                  {usd(s.price)}
+                  {/* only quote the discounted price when it can actually be paid */}
+                  {s.active && chipsEnabled && <s>{chipsPrice(s.price)} in chips</s>}
                 </span>
               </div>
               <div className="d">{s.long}</div>

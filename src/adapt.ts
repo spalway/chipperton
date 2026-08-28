@@ -34,7 +34,9 @@ export const adaptQueueRow = (q: QueueResponse): Job => ({
   payer: CURRENCY_LABEL[q.currency] ?? q.currency,
   amountUsd: q.amountUsd,
   chips: q.currency.toUpperCase().includes('CHIPS'),
-  status: q.status === 'running' ? 'running' : q.status === 'delivered' ? 'delivered' : 'queued',
+  // pass the server's status through verbatim — collapsing 'refunded' into
+  // 'queued' would tell a buyer their job is pending when they were repaid
+  status: q.status,
   etaMinutes: q.etaMinutes,
   // etaDeadline is on the live response but absent from the written contract —
   // confirmed present in code by the server author before relying on it.

@@ -71,7 +71,16 @@ function Detail({ job, openJob }: { job: Job; openJob: (id: string | null) => vo
         </div>
         <div className="jf">
           <div className="k">Report hash</div>
-          <div className="v">{job.reportHash ?? <span className="mut">on delivery</span>}</div>
+          <div className="v">
+            {job.reportHash ?? (
+              <span className="mut">
+                {/* a refunded job is never delivered, so "on delivery" would be false */}
+                {job.status === 'refunded' || job.status === 'expired'
+                  ? 'no report — refunded'
+                  : 'on delivery'}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* payer-gated */}

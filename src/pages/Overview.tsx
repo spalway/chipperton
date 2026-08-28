@@ -115,7 +115,7 @@ export default function Overview({ go, openJob }: Props) {
                 <div className="d">{s.short}</div>
               </div>
               <div className="r">
-                <div className="pz">${s.price}</div>
+                <div className="pz">{usd(s.price)}</div>
                 <div className="tt">{s.active ? s.turnaround : 'soon'}</div>
               </div>
             </div>
@@ -172,12 +172,18 @@ export default function Overview({ go, openJob }: Props) {
                   {j.chips ? <b>{j.payer}</b> : j.payer} · {usd(j.amountUsd)}
                 </td>
                 <td
-                  className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : ''}`}
+                  className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : j.status === 'refunded' || j.status === 'expired' ? ' ref' : ''}`}
                 >
                   {j.status}
                 </td>
                 <td className="eta">
-                  {j.status === 'delivered' ? j.deliveredAt : `${j.etaMinutes} min`}
+                  {j.status === 'delivered'
+                    ? j.deliveredAt
+                    : j.status === 'refunded' || j.status === 'expired'
+                      ? 'repaid'
+                      : j.etaMinutes != null
+                        ? `${j.etaMinutes} min`
+                        : '—'}
                 </td>
               </tr>
             ))}

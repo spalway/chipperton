@@ -2,9 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { address } from '@solana/kit';
-import { chipsEnabled, config } from './config.ts';
+import { REFUND_FEE_BUFFER, chipsEnabled, config } from './config.ts';
 import { db, type Order, type Service } from './db.ts';
-import { rpcPay, vaultAddress } from './chain/clients.ts';
+import { agentSigner, rpcPay, vaultAddress } from './chain/clients.ts';
 import { LAMPORTS_PER_SOL, buildOrderTransaction, newReference } from './chain/orders.ts';
 
 export const app = new Hono();
@@ -13,22 +13,45 @@ app.use('/*', cors({ origin: config.corsOrigin }));
 /* ------------------------------------------------------------------ status */
 
 app.get('/api/status', async (c) => {
-  const [{ value: balance }, solUsd, state, counts, turnaround, measuredCost] =
-    await Promise.all([
-      rpcPay.getBalance(vaultAddress).send(),
-      solPriceUsd(),
-      db.from('agent_state').select('*').eq('id', 1).single(),
-      // head:true + count:'exact' asks Postgres to count. Reading data.length
-      // instead would silently cap at the PostgREST row limit and under-report
-      // a real backlog as soon as it got interesting.
-      db
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ['paid', 'running']),
-      medianTurnaroundMinutes(),
-      measuredDailyCostUsd(),
-    ]);
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
 
+  const [
+    { value: balance },
+    { value: hotBalance },
+    solUsd,
+    state,
+    counts,
+    turnaround,
+    measuredCost,
+    liability,
+    deliveredCount,
+  ] = await Promise.all([
+    rpcPay.getBalance(vaultAddress).send(),
+    rpcPay.getBalance(agentSigner.address).send(),
+    solPriceUsd(),
+    db.from('agent_state').select('*').eq('id', 1).single(),
+    // head:true + count:'exact' asks Postgres to count. Reading data.length
+    // instead would silently cap at the PostgREST row limit and under-report
+    // a real backlog as soon as it got interesting.
+    db
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['paid', 'running']),
+    medianTurnaroundMinutes(),
+    measuredDailyCostUsd(),
+    db.from('orders').select('amount_lamports').in('status', ['paid', 'running']),
+    db
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'delivered')
+      .gte('delivered_at', startOfDay.toISOString()),
+  ]);
+
+  const refundLiability = (liability.data ?? []).reduce(
+    (sum, o) => sum + Number(o.amount_lamports),
+    0,
+  );
   const vaultLamports = Number(balance);
   const vaultUsd = solUsd === null ? null : (vaultLamports / LAMPORTS_PER_SOL) * solUsd;
   const declaredCostUsd = Number(state.data?.daily_cost_usd ?? config.dailyCostUsd);
@@ -59,6 +82,18 @@ app.get('/api/status', async (c) => {
       vaultUsd === null || effectiveCostUsd <= 0 ? null : vaultUsd / effectiveCostUsd,
 
     backlog: counts.count ?? 0,
+    deliveredToday: deliveredCount.count ?? 0,
+
+    /* ---- solvency ----------------------------------------------------
+     * Refunds are paid from the HOT wallet while payments fill the VAULT,
+     * so the hot wallet drains as the vault fills. "Can it honour what it
+     * already owes" is a truer liveness signal than tick timing: an agent
+     * that cannot refund has stopped being trustworthy even while it is
+     * still ticking happily. The worker refuses new work on this basis. */
+    hotWalletLamports: Number(hotBalance),
+    refundLiabilityLamports: refundLiability,
+    canHonourRefunds: Number(hotBalance) >= refundLiability + REFUND_FEE_BUFFER,
+
     lastTickAt,
     tickIntervalSeconds: interval,
     // SCHEDULED, not guaranteed — the worker is a cron tick, not a promise.

@@ -212,6 +212,7 @@
   .qt .st{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:var(--faint)}
   .qt .st.run{color:var(--green)}
   .qt .st.done{color:var(--muted)}
+  .qt .st.ref{color:var(--amber)}
   .qt .eta{font-family:var(--mono);font-size:10.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
   .qt tbody tr{cursor:pointer}
   .qt tbody tr:hover td{background:var(--card)}
