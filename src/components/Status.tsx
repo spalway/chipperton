@@ -68,7 +68,11 @@ export default function Status({ go, openJob }: Props) {
         <div className="sm green">
           <div className="k">Daily cost</div>
           <div className="v">{usd(s.dailyCostUsd)}</div>
-          <div className="s">{basis} · compute + inference</div>
+          {/* the server can explain its own basis and how far it is from the
+              other one; shown as a tooltip when it does, absent when it does not */}
+          <div className="s" title={s.dailyCostBasisReason ?? undefined}>
+            {basis} · compute + inference
+          </div>
           {link(
             'costs',
             basis === 'measured' ? 'cost receipt →' : 'cost breakdown →',

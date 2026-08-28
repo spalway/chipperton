@@ -120,3 +120,33 @@ describe('clockOf', () => {
     expect(clockOf('not a date')).toBe('—')
   })
 })
+
+describe('etaBasis — the label that flips on the first delivered job', () => {
+  it('passes the basis through the adapter rather than dropping it', async () => {
+    // It was declared in the API type and never read: the UI carried the field
+    // and rendered the number unqualified. This asserts it survives to display.
+    const { adaptQueueRow } = await import('./adapt')
+    expect(adaptQueueRow(row({ etaBasis: 'declared' })).etaBasis).toBe('declared')
+    expect(adaptQueueRow(row({ etaBasis: 'measured' })).etaBasis).toBe('measured')
+  })
+
+  it('says a declared estimate has not been observed', async () => {
+    const { etaBasisNote } = await import('./data')
+    expect(etaBasisNote('declared')).toMatch(/not yet observed/)
+    expect(etaBasisNote('declared')).not.toMatch(/measured —/)
+  })
+
+  it('says a measured estimate comes from delivered work', async () => {
+    // exercised now, before the first delivery flips it, so the branch is not
+    // seen for the first time in production
+    const { etaBasisNote } = await import('./data')
+    expect(etaBasisNote('measured')).toMatch(/from jobs already delivered/)
+    expect(etaBasisNote('measured')).not.toMatch(/not yet observed/)
+  })
+
+  it('never describes a declared estimate as measured', async () => {
+    const { etaBasisNote } = await import('./data')
+    expect(etaBasisNote('declared').startsWith('declared')).toBe(true)
+    expect(etaBasisNote('measured').startsWith('measured')).toBe(true)
+  })
+})

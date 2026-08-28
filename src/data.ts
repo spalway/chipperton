@@ -154,6 +154,21 @@ export const turnaroundLabel = (mins: number) => {
   return `${Math.round(mins)} min`
 }
 
+/**
+ * What an ETA is actually based on, in words.
+ *
+ * 'declared' is the service's configured time — a target nobody has met yet.
+ * 'measured' is derived from jobs that have actually been delivered. Rendering
+ * the first as though it were the second is the same overclaim as a declared
+ * daily cost presented as observed spend.
+ *
+ * This flips on the FIRST delivered job, with nothing for anyone to deploy.
+ */
+export const etaBasisNote = (basis: CostBasis) =>
+  basis === 'measured'
+    ? 'measured — from jobs already delivered'
+    : 'declared — the time this service targets, not yet observed'
+
 export const usd = (n: number) =>
   `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -407,6 +422,14 @@ export type Job = {
   status: 'running' | 'queued' | 'delivered' | 'refunded' | 'expired'
   /** live estimate — queuePosition × median service minutes, moves as the queue drains */
   etaMinutes: number | null
+  /**
+   * Whether that estimate is a configured guess or derived from delivered work.
+   *
+   * Flips to 'measured' on the FIRST delivered job, with nothing for either of
+   * us to do. Until then the number is the service's declared time, and showing
+   * it unqualified claims an accuracy nothing has observed yet.
+   */
+  etaBasis: CostBasis
   /** committed at settle and immutable — the deadline a refund is owed against */
   etaDeadline: string | null
   /**
@@ -443,43 +466,43 @@ export type JobPrivate = {
 export const JOBS: Job[] = [
   {
     id: '#0412', rawId: '0412', service: 'Token safety check', payer: '$CHIPS', amountSol: 0.045, amountUsd: 5.4, chips: true,
-    status: 'running', awaitingDelivery: true, terminal: false, etaMinutes: 3, etaDeadline: '12:12', deliveredAt: null,
+    status: 'running', awaitingDelivery: true, terminal: false, etaMinutes: 3, etaBasis: 'declared', etaDeadline: '12:12', deliveredAt: null,
     createdAt: '12:04:11', paidAt: '12:04:33', paymentSig: '5xQ2…mb3z',
     receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
     id: '#0411', rawId: '0411', service: 'Transaction trace', payer: 'USDC', amountSol: 0.085, amountUsd: 9, chips: false,
-    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 23, etaDeadline: '12:12', deliveredAt: null,
+    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 23, etaBasis: 'declared', etaDeadline: '12:12', deliveredAt: null,
     createdAt: '11:51:50', paidAt: '11:52:18', paymentSig: '7bTn…Lp4w',
     receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
     id: '#0410', rawId: '0410', service: 'Wallet activity report', payer: '$CHIPS', amountSol: 0.036, amountUsd: 3.6, chips: true,
-    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 35, etaDeadline: '11:10', deliveredAt: null,
+    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 35, etaBasis: 'declared', etaDeadline: '11:10', deliveredAt: null,
     createdAt: '10:57:44', paidAt: '10:58:12', paymentSig: '8mCd…Yu2p',
     receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
     id: '#0409', rawId: '0409', service: 'Bundle / cluster detection', payer: 'SOL', amountSol: 0.11, amountUsd: 12, chips: false,
-    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 60, etaDeadline: '10:28', deliveredAt: null,
+    status: 'queued', awaitingDelivery: true, terminal: false, etaMinutes: 60, etaBasis: 'declared', etaDeadline: '10:28', deliveredAt: null,
     createdAt: '10:02:51', paidAt: '10:03:19', paymentSig: '6Vb2…Ax5j',
     receiptSig: null, reportHash: null, paymentUrl: null, receiptUrl: null,
   },
   {
     id: '#0408', rawId: '0408', service: 'Program IDL brief', payer: '$CHIPS', amountSol: 0.0675, amountUsd: 7.2, chips: true,
-    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '11:06', deliveredAt: '11:04',
+    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaBasis: 'declared', etaDeadline: '11:06', deliveredAt: '11:04',
     createdAt: '10:47:39', paidAt: '10:48:11', paymentSig: '2Hx9…Rt6v',
     receiptSig: '2Hx9…Rt6v', reportHash: 'a4f9c118…7e21', paymentUrl: null, receiptUrl: null,
   },
   {
     id: '#0407', rawId: '0407', service: 'Token safety check', payer: 'SOL', amountSol: 0.05, amountUsd: 6, chips: false,
-    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '10:42', deliveredAt: '10:41',
+    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaBasis: 'declared', etaDeadline: '10:42', deliveredAt: '10:41',
     createdAt: '10:33:30', paidAt: '10:34:02', paymentSig: '1Pw4…Gh8n',
     receiptSig: '4Nq7…Zk9s', reportHash: 'c2b7e04d…9f13', paymentUrl: null, receiptUrl: null,
   },
   {
     id: '#0406', rawId: '0406', service: 'Watchlist digest', payer: '$CHIPS', amountSol: 0.126, amountUsd: 13.5, chips: true,
-    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaDeadline: '09:14', deliveredAt: '09:00',
+    status: 'delivered', awaitingDelivery: false, terminal: true, etaMinutes: null, etaBasis: 'declared', etaDeadline: '09:14', deliveredAt: '09:00',
     createdAt: '08:13:58', paidAt: '08:14:22', paymentSig: '3Rk8…Bn2f',
     receiptSig: '5Tz6…Kv1c', reportHash: '77d1a35b…4c08', paymentUrl: null, receiptUrl: null,
   },

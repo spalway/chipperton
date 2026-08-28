@@ -475,3 +475,5 @@
     .xlink{padding:5px 6px}
     .xlink span{display:none}
   }
+  /* what an estimate is based on — a target, or something actually observed */
+  .jf .basis{font-family:var(--sans);font-size:9.5px;color:var(--faint);margin-top:3px;line-height:1.4}

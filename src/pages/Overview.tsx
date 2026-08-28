@@ -1,6 +1,7 @@
 import {
   AGENT,
   DECISIONS,
+  etaBasisNote,
   measuredTurnaroundMins,
   runwayDays,
   sol,
@@ -229,7 +230,7 @@ export default function Overview({ go, openJob }: Props) {
                 >
                   {j.status}
                 </td>
-                <td className="eta">
+                <td className="eta" title={j.etaMinutes != null ? etaBasisNote(j.etaBasis) : undefined}>
                   {j.status === 'delivered'
                     ? j.deliveredAt
                     : !j.awaitingDelivery

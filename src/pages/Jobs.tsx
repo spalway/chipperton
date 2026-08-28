@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { JOB_PRIVATE, sol, usdApprox, type Job, type View } from '../data'
+import { JOB_PRIVATE, etaBasisNote, sol, usdApprox, type Job, type View } from '../data'
 import { useResolved } from '../useLiveData'
 import { useReport } from '../useReport'
 
@@ -146,7 +146,12 @@ function Detail({
             ) : ended ? (
               <span className="mut">refunded — no longer queued</span>
             ) : job.etaMinutes != null ? (
-              `~${job.etaMinutes} min`
+              <>
+                ~{job.etaMinutes} min
+                {/* the server says whether this is a target or an observation;
+                    the number alone cannot distinguish them */}
+                <div className="basis">{etaBasisNote(job.etaBasis)}</div>
+              </>
             ) : (
               <span className="mut">not yet estimated</span>
             )}

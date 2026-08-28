@@ -33,6 +33,15 @@ export type StatusResponse = {
   measuredDailyCostUsd: number | null
   /** Which of the two `runwayDays` used. Drives every cost/runway label. */
   dailyCostBasis: CostBasisField
+  /**
+   * Why it is on that basis, and how far off the other one is — e.g.
+   * "needs 5+ entries spanning 24h+ to be a rate; have 0 over 0.0h".
+   *
+   * OPTIONAL because it was not on the endpoint when this was written, whatever
+   * the deploy notes said. Rendered only when present, so its arrival is an
+   * improvement rather than a requirement.
+   */
+  dailyCostBasisReason?: string | null
   runwayDays: number | null
   backlog: number
   /** Delivered since UTC midnight. */
