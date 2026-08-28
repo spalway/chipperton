@@ -51,8 +51,25 @@ export type StatusResponse = {
   medianTurnaroundMinutes: number | null
   /** Cluster payments settle on. Research jobs read mainnet regardless. */
   payCluster: string
-  /** false while $CHIPS has no mint — the discount path cannot function. */
+  /**
+   * DERIVED from `chipsMint` server-side, so the two can no longer disagree.
+   * Previously an independent flag, which meant a stale config could claim the
+   * token was payable with no mint to show, or hide a mint that existed.
+   */
   chipsEnabled: boolean
+  /** The $CHIPS mint. Null until launch. */
+  chipsMint: string | null
+  /** pump.fun page for the mint. Null until launch — render nothing, not a dead link. */
+  chipsUrl: string | null
+  /**
+   * The discount, from the server rather than a client constant. Both sides
+   * hardcoding 10 works until one changes, and then the shop advertises a
+   * discount the order endpoint will not honour.
+   */
+  chipsDiscountPct: number
+  /** Without the @, so the glyph is ours to render. Null if unset. */
+  twitterHandle: string | null
+  twitterUrl: string | null
   vaultUrl: string | null
   hotWalletUrl: string | null
 }

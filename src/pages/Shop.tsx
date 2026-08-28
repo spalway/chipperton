@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  CHIPS,
   chipsPriceSol,
   measuredTurnaroundMins,
   sol,
@@ -35,6 +36,8 @@ export default function Shop() {
   // while the token has no mint — pump.fun is mainnet-only and payments settle
   // on devnet — so offering it would be a button that cannot work.
   const chipsEnabled = status ? status.chipsEnabled : true
+  // server-side, so the price quoted here and the price orders honour cannot drift
+  const discountPct = status?.chipsDiscountPct ?? CHIPS.discountPct
   const [payWith, setPayWith] = useState<'chips' | 'sol'>('chips')
   const pay = chipsEnabled ? payWith : 'sol'
   const backlog = status ? status.backlog : queue.filter((j) => j.status !== 'delivered').length
@@ -48,7 +51,7 @@ export default function Shop() {
         <p>
           Everything Chipperton sells. Pay up front, work starts when the transaction confirms,
           and you get a refund if it misses its own estimate.{' '}
-          <b>Pay in $CHIPS and every price drops 10%.</b>
+          <b>Pay in $CHIPS and every price drops {discountPct}%.</b>
         </p>
       </div>
 
@@ -69,7 +72,7 @@ export default function Shop() {
               $CHIPS<s>{chipsEnabled ? 'token holders' : 'not available until the token launches'}</s>
             </div>
             <span className={chipsEnabled ? 'off' : 'soonchip'}>
-              {chipsEnabled ? '−10%' : 'soon'}
+              {chipsEnabled ? `−${discountPct}%` : 'soon'}
             </span>
           </div>
           <div className={`opt${pay === 'sol' ? ' on' : ''}`} onClick={() => setPayWith('sol')}>
@@ -106,7 +109,7 @@ export default function Shop() {
                   {sol(s.priceSol)}
                   {usdApprox(s.price) && <s className="approx">{usdApprox(s.price)}</s>}
                   {/* only quote the discounted price when it can actually be paid */}
-                  {s.active && chipsEnabled && <s>{chipsPriceSol(s.priceSol)} in chips</s>}
+                  {s.active && chipsEnabled && <s>{chipsPriceSol(s.priceSol, discountPct)} in chips</s>}
                 </span>
               </div>
               <div className="d">{s.long}</div>

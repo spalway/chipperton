@@ -210,8 +210,8 @@ export type Service = {
  * one it comes from. Passing the floating USD conversion in here would compound
  * an approximation into a number that looks like a quote.
  */
-export const chipsPriceSol = (priceSol: number) =>
-  sol(priceSol * (1 - CHIPS.discountPct / 100))
+export const chipsPriceSol = (priceSol: number, discountPct = CHIPS.discountPct) =>
+  sol(priceSol * (1 - discountPct / 100))
 
 /** USD equivalent of the discount. Null in, null out — never "$0.00". */
 export const chipsPrice = (usd: number | null | undefined) =>

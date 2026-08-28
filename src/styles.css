@@ -461,3 +461,17 @@
   .svc .pzu{font-family:var(--mono);font-size:9.5px;color:var(--faint);
     font-variant-numeric:tabular-nums;margin-top:1px}
   .qt .pay .mut{color:var(--faint)}
+
+  /* X account, sits next to Connect in the nav */
+  .xlink{display:inline-flex;align-items:center;gap:5px;flex:none;font-size:11px;
+    color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:2px;
+    border:1px solid transparent;transition:.12s;white-space:nowrap}
+  .xlink:hover{color:var(--text);border-color:var(--line-2)}
+  .xlink svg{flex:none}
+  /* contract address — a real link only once there is a real page to open */
+  .ca{color:var(--green);text-decoration:none;border-bottom:1px solid rgba(34,255,142,.4)}
+  .ca:hover{border-bottom-color:var(--green)}
+  @media (max-width:620px){
+    .xlink{padding:5px 6px}
+    .xlink span{display:none}
+  }
