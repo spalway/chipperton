@@ -373,6 +373,42 @@ app.post('/api/orders', async (c) => {
   }
 
   const s = service as Service;
+
+  /*
+   * Refuse the order if the agent could not refund it.
+   *
+   * The worker already gates on this before claiming work, but that is too
+   * late — by then the buyer has paid. Without this check an insolvent agent
+   * happily quotes, takes real money, settles it, then declines to work the
+   * job, and the overdue refund fails because the hot wallet is empty. The
+   * order lands in `failed`: paid, undelivered, unrefunded, needing a human.
+   *
+   * Checking here means an agent that cannot honour its promises stops
+   * selling instead of stopping halfway through.
+   */
+  const [{ value: hotBalance }, { data: owedRows }] = await Promise.all([
+    rpcPay.getBalance(agentSigner.address).send(),
+    db.from('orders').select('amount_lamports').in('status', ['paid', 'running']),
+  ]);
+
+  const owed = (owedRows ?? []).reduce((sum, o) => sum + Number(o.amount_lamports), 0);
+  // Include THIS order — it is about to become a liability.
+  const wouldOwe = owed + s.price_lamports + REFUND_FEE_BUFFER;
+
+  if (Number(hotBalance) < wouldOwe) {
+    return c.json(
+      {
+        error:
+          'Chipperton is not accepting orders — it cannot currently cover a refund ' +
+          'for this job, so it will not take payment for it.',
+        canHonourRefunds: false,
+        hotWalletLamports: Number(hotBalance),
+        requiredLamports: wouldOwe,
+      },
+      503,
+    );
+  }
+
   const id = await nextOrderId();
   const reference = await newReference();
   const accessToken = randomBytes(24).toString('base64url');
