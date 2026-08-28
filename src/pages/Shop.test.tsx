@@ -47,14 +47,14 @@ const STATUS = {
   hotWalletUrl: null,
 }
 
-const mount = async (priceUsd: number | null) => {
+const mount = async (priceUsd: number | null, statusOverrides: Partial<typeof STATUS> = {}) => {
   vi.resetModules()
   vi.stubEnv('VITE_API_URL', 'https://api.example')
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
       const body = url.includes('/api/status')
-        ? STATUS
+        ? { ...STATUS, ...statusOverrides }
         : url.includes('/api/services')
           ? [{ ...SERVICE, priceUsd }]
           : []
@@ -107,5 +107,22 @@ describe('shop pricing shows both figures', () => {
     // "$0.00" would advertise a paid job as free
     expect(document.body.textContent).not.toContain('$0.00')
     expect(document.body.textContent).not.toMatch(/~\$/)
+  })
+})
+
+describe('the shop closes when the agent cannot refund', () => {
+  it('offers no Buy button while canHonourRefunds is false', async () => {
+    // POST /api/orders returns 503 in this state. A live Buy button would send
+    // the buyer through connect-wallet and address-entry to reach a dead end.
+    await mount(5.33, { canHonourRefunds: false })
+    expect(screen.queryByRole('button', { name: /Buy/ })).toBeNull()
+    expect(screen.getAllByText('paused').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Not taking orders right now/)).toBeInTheDocument()
+  })
+
+  it('offers Buy normally when it can refund', async () => {
+    await mount(5.33, { canHonourRefunds: true })
+    expect(screen.getAllByRole('button', { name: /Buy/ }).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Not taking orders right now/)).toBeNull()
   })
 })

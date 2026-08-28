@@ -38,6 +38,13 @@ export default function Shop() {
   const chipsEnabled = status ? status.chipsEnabled : true
   // server-side, so the price quoted here and the price orders honour cannot drift
   const discountPct = status?.chipsDiscountPct ?? CHIPS.discountPct
+  /**
+   * The worker refuses to take payment it could not refund, and POST /api/orders
+   * returns 503 while that is true. Without reading it here the shop advertises
+   * live Buy buttons for an endpoint that will reject every one of them — the
+   * buyer finds out only after connecting a wallet and entering an address.
+   */
+  const accepting = status ? status.canHonourRefunds : true
   const [payWith, setPayWith] = useState<'chips' | 'sol'>('chips')
   const pay = chipsEnabled ? payWith : 'sol'
   const backlog = status ? status.backlog : queue.filter((j) => j.status !== 'delivered').length
@@ -54,6 +61,18 @@ export default function Shop() {
           <b>Pay in $CHIPS and every price drops {discountPct}%.</b>
         </p>
       </div>
+
+      {/* Not the "can honour refunds / so it is accepting new work" reassurance
+          that was removed — this is its opposite, and only ever shows when the
+          agent genuinely cannot take the job. Data-driven, so it disappears by
+          itself the moment the refund wallet is funded. */}
+      {!accepting && (
+        <div className="srcnote">
+          <b>Not taking orders right now.</b> Chipperton will not accept payment for a job it
+          could not refund, and its refund wallet is short. The shop reopens on its own once
+          that is covered — nothing to do but come back.
+        </div>
+      )}
 
       <section>
         <div className="shead">
@@ -115,12 +134,14 @@ export default function Shop() {
               <div className="d">{s.long}</div>
               <div className="foot">
                 <span className="tt">{s.active ? s.turnaround : 'not yet available'}</span>
-                {s.active ? (
+                {!s.active ? (
+                  <span className="soonchip">soon</span>
+                ) : !accepting ? (
+                  <span className="soonchip">paused</span>
+                ) : (
                   <button className="buy" type="button" onClick={() => setBuying(s)}>
                     {address ? 'Buy' : 'Buy →'}
                   </button>
-                ) : (
-                  <span className="soonchip">soon</span>
                 )}
               </div>
             </div>

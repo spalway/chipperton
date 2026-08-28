@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { inputSpec, sol, usdApprox, type Service } from '../data'
 import { isSignature, isSolanaAddress, short } from '../wallet'
 import { useWallet } from '../WalletProvider'
+import { useResolved } from '../useLiveData'
 import { useOrderFlow } from '../useOrderFlow'
 import { clusterLabel } from '../wallet'
 
@@ -16,6 +17,12 @@ import { clusterLabel } from '../wallet'
 export default function BuyPanel({ service, onClose }: { service: Service; onClose: () => void }) {
   const spec = inputSpec(service.id)
   const { address, payCluster, chain } = useWallet()
+  // named `live` because `status` below is the ORDER's status — two different
+  // things one word apart, which is how they collided in the first place
+  const { status: live } = useResolved()
+  // same gate the worker applies, read from the same field, so the shop and the
+  // agent cannot disagree about whether it is open
+  const accepting = live ? live.canHonourRefunds : true
   const flow = useOrderFlow(service.id)
   const [input, setInput] = useState('')
 
@@ -86,7 +93,15 @@ export default function BuyPanel({ service, onClose }: { service: Service; onClo
               <span className="bv">{clusterLabel(payCluster)}</span>
             </div>
 
-            {!address ? (
+            {!accepting ? (
+              // the order endpoint 503s while this is false, so letting someone
+              // connect a wallet and type an address first is a dead end dressed
+              // as a checkout
+              <div className="bnote bad">
+                Chipperton is not taking orders right now — it will not accept payment for a job
+                it could not refund. This clears on its own once the refund wallet is covered.
+              </div>
+            ) : !address ? (
               <div className="bnote">Connect a wallet to order.</div>
             ) : !chain ? (
               <div className="bnote">
@@ -102,7 +117,7 @@ export default function BuyPanel({ service, onClose }: { service: Service; onClo
             <button
               className="bgo"
               type="button"
-              disabled={!valid || !flow.canPay || flow.phase === 'quoting'}
+              disabled={!accepting || !valid || !flow.canPay || flow.phase === 'quoting'}
               onClick={() => void flow.requestQuote(input)}
             >
               {flow.phase === 'quoting' ? 'Getting a price…' : 'Get a price'}
