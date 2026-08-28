@@ -1,0 +1,42 @@
+{
+  "name": "chipperton-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Chipperton API + agent worker. Separate Railway service from the static site.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --env-file=.env --watch src/index.ts",
+    "start": "node src/index.ts",
+    "worker": "node --env-file=.env src/worker.ts",
+    "typecheck": "tsc --noEmit",
+    "try:safety": "node --env-file=.env scripts/try-safety.ts",
+    "try:loop": "node --env-file=.env scripts/try-loop.ts"
+  },
+  "//": "The @solana/* version set is pinned to what @solana/pay@1.0.26 peers on (kit ^6.9). Do NOT bump @solana/kit to 8.x without also replacing @solana/pay — validateTransfer performs the security-critical payment checks and a two-major kit gap will break it. See PLAN.md §7.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.122.0",
+    "@hono/node-server": "^2.1.1",
+    "@solana-program/compute-budget": "^0.16.0",
+    "@solana-program/memo": "^0.11.0",
+    "@solana-program/system": "^0.12.0",
+    "@solana-program/token": "^0.12.0",
+    "@solana-program/token-2022": "^0.9.0",
+    "@solana/keys": "^6.9.0",
+    "@solana/kit": "^6.9.0",
+    "@solana/kit-plugin-instruction-plan": "^0.10.0",
+    "@solana/kit-plugin-rpc": "^0.11.1",
+    "@solana/kit-plugin-signer": "^0.10.0",
+    "@solana/pay": "^1.0.26",
+    "@solana/rpc-subscriptions-api": "^6.9.0",
+    "@solana/rpc-subscriptions-spec": "^6.9.0",
+    "@supabase/supabase-js": "^2.112.4",
+    "hono": "^4.13.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "typescript": "^5.9.3"
+  }
+}
