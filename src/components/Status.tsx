@@ -51,8 +51,30 @@ export default function Status({ go, openJob }: Props) {
   // ── live ────────────────────────────────────────────────────────────────
   if (s) {
     const basis = s.dailyCostBasis
+    const sol = (l: number) => `${(l / 1e9).toFixed(4)} SOL`
     return (
-      <div className="statrow">
+      <>
+        {/* Solvency is a better liveness signal than tick timing: refunds are paid
+            from the hot wallet while payments fill the vault, so it can degrade
+            silently and only discover it when it owes someone money. The flag uses
+            the same buffer the worker gates on, so page and agent cannot disagree. */}
+        <div className={`solv ${s.canHonourRefunds ? 'ok' : 'bad'}`}>
+          <span className="dot2" />
+          {s.canHonourRefunds ? (
+            <>
+              <b>Can honour refunds.</b> {sol(s.hotWalletLamports)} in the refund wallet against{' '}
+              {sol(s.refundLiabilityLamports)} outstanding — so it is accepting new work.
+            </>
+          ) : (
+            <>
+              <b>Cannot cover outstanding refunds.</b> {sol(s.hotWalletLamports)} against{' '}
+              {sol(s.refundLiabilityLamports)} owed — it has stopped accepting new work.
+              Settlements and refunds already in flight continue.
+            </>
+          )}
+        </div>
+
+        <div className="statrow">
         <div className="sm white">
           <div className="k">Runway</div>
           <div className="v">{s.runwayDays == null ? '—' : `${s.runwayDays.toFixed(1)}d`}</div>
@@ -97,7 +119,8 @@ export default function Status({ go, openJob }: Props) {
           </div>
           {link('decisions', 'view decision history →', 'red')}
         </div>
-      </div>
+        </div>
+      </>
     )
   }
 

@@ -137,31 +137,52 @@ app.get('/api/services', async (c) => {
  * perform the join between a wallet and the address it asked about. That join
  * is the deanonymising part, and it is the part we control.
  */
+const QUEUE_PAGE_LIMIT = 25;
+
 app.get('/api/queue', async (c) => {
-  const { data, error } = await db
+  const { data, error, count } = await db
     .from('orders')
-    .select('id,service_id,status,currency,amount_lamports,created_at,paid_at,delivered_at,payment_sig,receipt_sig,eta_deadline,report_hash')
+    .select(
+      'id,service_id,status,currency,amount_lamports,created_at,paid_at,delivered_at,payment_sig,receipt_sig,eta_deadline,report_hash',
+      { count: 'exact' },
+    )
     .in('status', ['paid', 'running', 'delivered', 'refunded'])
     .order('created_at', { ascending: false })
-    .limit(25);
+    .limit(QUEUE_PAGE_LIMIT);
+
+  // This response is a PAGE, not the whole set. Any total derived by counting
+  // these rows is wrong the moment there are more than QUEUE_PAGE_LIMIT orders,
+  // and wrong silently. Advertised in headers so a client can detect the
+  // truncation without the response shape changing under it.
+  c.header('X-Queue-Total', String(count ?? 0));
+  c.header('X-Queue-Limit', String(QUEUE_PAGE_LIMIT));
+  c.header('X-Queue-Truncated', String((count ?? 0) > QUEUE_PAGE_LIMIT));
 
   // An empty queue and an unreachable database look identical to the frontend
   // unless we distinguish them here.
   if (error) return c.json({ error: `queue unavailable: ${error.message}` }, 503);
 
-  const [services, solUsd, measured] = await Promise.all([
+  const [services, solUsd, measured, openQueue] = await Promise.all([
     serviceMap(),
     solPriceUsd(),
     medianTurnaroundMinutes(),
+    // Queue position MUST come from the whole open queue, never from the page
+    // above. That page is the 25 most recent orders by created_at DESC, while
+    // work is claimed oldest-paid-FIRST — so the job actually next in line can
+    // sit outside the page entirely, and any position derived from the page is
+    // wrong in the optimistic direction once there are more than 25 orders.
+    // Same error as reporting a sampling window as full history.
+    db
+      .from('orders')
+      .select('id')
+      .in('status', ['paid', 'running'])
+      .order('paid_at', { ascending: true }),
   ]);
 
-  // Live queue estimate: position in the open queue x how long a job actually
-  // takes. Distinct from etaDeadline, which was committed at settle and never
-  // moves — the refund is owed against THAT, not against this.
-  const open = (data ?? [])
-    .filter((o) => o.status === 'paid' || o.status === 'running')
-    .sort((a, b) => Date.parse(a.paid_at ?? '') - Date.parse(b.paid_at ?? ''))
-    .map((o) => o.id);
+  // Live queue estimate: true position in the open queue x how long a job
+  // actually takes. Distinct from etaDeadline, which was committed at settle
+  // and never moves — the refund is owed against THAT, not against this.
+  const open = (openQueue.data ?? []).map((o) => o.id);
 
   return c.json(
     (data ?? []).map((o) => {

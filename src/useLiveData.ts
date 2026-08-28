@@ -49,6 +49,14 @@ export function useResolved() {
     queue: isLive && live.queue ? live.queue.map(adaptQueueRow) : JOBS,
     /** true when the API answered and genuinely has no rows */
     emptyQueue: isLive && (live.queue?.length ?? 0) === 0,
+    /**
+     * Delivered since UTC midnight. Server-side when live — counting delivered
+     * rows in the visible queue would silently mean "delivered in this page of
+     * results", which is the sampling-window error in miniature.
+     */
+    deliveredToday: isLive
+      ? (live.status?.deliveredToday ?? 0)
+      : JOBS.filter((j) => j.status === 'delivered').length,
   }
 }
 

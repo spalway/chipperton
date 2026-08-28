@@ -13,7 +13,7 @@ type Props = { go: (v: View) => void; openJob: (id: string | null) => void }
 
 export default function Overview({ go, openJob }: Props) {
   // every figure below is derived from the day ledger / JOBS — nothing hand-typed
-  const { services, queue, isLive, emptyQueue } = useResolved()
+  const { services, queue, isLive, emptyQueue, deliveredToday } = useResolved()
   const open = queue.filter((j) => j.status !== 'delivered')
   const turnaround = isLive ? null : measuredTurnaroundMins()
 
@@ -144,7 +144,7 @@ export default function Overview({ go, openJob }: Props) {
             queue<span className="n">{open.length}</span>
           </h2>
           <span className="meta">
-            {queue.filter((j) => j.status === 'delivered').length} delivered
+            {deliveredToday} delivered today
             {turnaround ? ` · ${turnaround} min median turnaround, measured` : ''}
           </span>
         </div>

@@ -33,6 +33,15 @@ export type StatusResponse = {
   dailyCostBasis: CostBasisField
   runwayDays: number | null
   backlog: number
+  /** Delivered since UTC midnight. */
+  deliveredToday: number
+  /* ── solvency: refunds are paid from the hot wallet, payments fill the vault,
+     so the hot wallet drains as the vault fills. This is the liveness signal
+     that matters — "can it honour what it already owes" beats tick timing. ── */
+  hotWalletLamports: number
+  refundLiabilityLamports: number
+  /** Same buffer the worker gates on, so the page and the agent cannot disagree. */
+  canHonourRefunds: boolean
   lastTickAt: string | null
   tickIntervalSeconds: number
   /** Scheduled, not guaranteed — the worker is best-effort cron. */
@@ -64,14 +73,20 @@ export type QueueResponse = {
   serviceName: string
   status: 'queued' | 'running' | 'delivered' | 'refunded' | 'expired'
   currency: string
+  amountSol: number
   amountUsd: number
   createdAt: string
   paidAt: string | null
+  /** Live estimate — moves as the queue drains. */
   etaMinutes: number | null
-  etaBasis?: CostBasisField
+  etaBasis: CostBasisField
+  /** Committed at settle and immutable — what a refund is owed against. */
+  etaDeadline: string | null
   deliveredAt: string | null
   paymentSig: string | null
   receiptSig: string | null
+  /** Public: the same hash is broadcast in the receipt memo on chain. */
+  reportHash: string | null
 }
 
 export type CostEntry = {
