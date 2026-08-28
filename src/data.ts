@@ -155,6 +155,24 @@ export const turnaroundLabel = (mins: number) => {
 }
 
 /**
+ * A tick interval, phrased to follow the word "every".
+ *
+ * `Math.round(seconds / 60)` was fine at 900 and wrong the moment the worker
+ * dropped to 60: it renders "every 1 min", and the prose version read "every 1
+ * minutes". It also rounds 45 seconds to "1 min", overstating the gap.
+ *
+ * Sub-minute intervals are real here — the worker ticks every 60s — so seconds
+ * are a first-class case rather than an edge one.
+ */
+export const intervalLabel = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'tick'
+  if (seconds < 60) return `${Math.round(seconds)} sec`
+  if (seconds < 120) return 'minute'
+  const mins = seconds / 60
+  return Number.isInteger(mins) ? `${mins} min` : `${mins.toFixed(1)} min`
+}
+
+/**
  * What an ETA is actually based on, in words.
  *
  * 'declared' is the service's configured time — a target nobody has met yet.

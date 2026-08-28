@@ -133,7 +133,7 @@ describe('$CHIPS contract address', () => {
   })
 })
 
-describe('agenda — derived, and empty means done', () => {
+describe('agenda area — tiles kept, item list deliberately not rendered', () => {
   const mountOverview = async (agenda?: unknown) => {
     vi.resetModules()
     vi.stubEnv('VITE_API_URL', 'https://api.example')
@@ -162,36 +162,41 @@ describe('agenda — derived, and empty means done', () => {
     )
   }
 
-  it('never shows the invented EARN/SPEND/PASS prose when live', async () => {
-    // "Cleared six jobs" and "+$54.00 net" were constants rendered in live mode,
-    // indistinguishable from real activity to a reader.
+  it('never shows the invented EARN/SPEND/PASS prose', async () => {
+    // These were constants rendered in LIVE mode too, indistinguishable from
+    // real activity. Gone from both modes now, not merely gated.
     await mountOverview([])
-    await waitFor(() => expect(screen.getByText(/Nothing outstanding/)).toBeInTheDocument())
+    await waitFor(() => expect(document.querySelector('.qhead')).not.toBeNull())
     expect(document.body.textContent).not.toContain('Cleared six jobs')
-    expect(document.body.textContent).not.toContain('+$54.00')
+    expect(document.body.textContent).not.toContain('Bought RPC credits')
+    expect(document.body.textContent).not.toContain('54.00')
   })
 
-  it('treats an empty agenda as success, not as missing data', async () => {
-    await mountOverview([])
-    expect(await screen.findByText(/Nothing outstanding/)).toBeInTheDocument()
-  })
-
-  it('renders nothing rather than "nothing outstanding" when the server sent no agenda', async () => {
-    // absent is unknown; empty is a claim. They must not render the same.
-    await mountOverview(undefined)
-    await waitFor(() => expect(screen.queryByText(/Cleared six jobs/)).toBeNull())
-    expect(screen.queryByText(/Nothing outstanding/)).toBeNull()
-  })
-
-  it('keeps blocked and waiting visually distinct', async () => {
+  it('does not render agenda items even when the server sends them', async () => {
+    // Deliberate, at the user's request. The field is still served and still
+    // derived; this layout just does not show it. If this test starts failing,
+    // the list has come back by accident rather than by decision.
     await mountOverview([
       { kind: 'blocked', title: 'Not accepting orders', detail: 'd1', clearsWhen: 'funded' },
-      { kind: 'waiting', title: '$CHIPS not launched', detail: 'd2', clearsWhen: 'mint set' },
+      { kind: 'waiting', title: 'CHIPS not launched', detail: 'd2', clearsWhen: 'mint set' },
     ])
-    await waitFor(() => expect(screen.getByText('Not accepting orders')).toBeInTheDocument())
-    expect(document.querySelector('.tg.ag-blocked')).not.toBeNull()
-    expect(document.querySelector('.tg.ag-waiting')).not.toBeNull()
-    expect(screen.getByText(/clears when funded/)).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('.qhead')).not.toBeNull())
+    expect(screen.queryByText('Not accepting orders')).toBeNull()
+    expect(document.querySelector('.dec')).toBeNull()
+  })
+
+  it('keeps the four tiles, which were explicitly asked to stay', async () => {
+    await mountOverview([])
+    await waitFor(() => expect(screen.getByText('Runway')).toBeInTheDocument())
+    for (const k of ['Runway', 'Daily cost', 'Backlog', 'Next decision']) {
+      expect(screen.getByText(k)).toBeInTheDocument()
+    }
+  })
+
+  it('fills the vacated space with the queue', async () => {
+    await mountOverview([])
+    await waitFor(() => expect(document.querySelector('.qhead')).not.toBeNull())
+    expect(screen.getByText(/No orders yet/)).toBeInTheDocument()
   })
 })
 
@@ -270,5 +275,34 @@ describe('the two wallet links', () => {
     await mountOverview({ ...LIVE, hotWalletUrl: null })
     expect(await screen.findByText('[vault] ↗')).toBeInTheDocument()
     expect(screen.queryByText('[hot] ↗')).toBeNull()
+  })
+})
+
+describe('the compact queue that replaced the agenda list', () => {
+  it('renders a row per job, with service, amount and status', async () => {
+    // Sample mode, because the live queue is empty — this is the only way to
+    // see the populated layout before real orders exist.
+    vi.resetModules()
+    vi.stubEnv('VITE_API_URL', '')
+    const [{ default: Overview }, { default: WalletProvider }, { default: LiveDataProvider }, { JOBS }] =
+      await Promise.all([
+        import('../pages/Overview'),
+        import('../WalletProvider'),
+        import('../LiveDataProvider'),
+        import('../data'),
+      ])
+    render(
+      <LiveDataProvider>
+        <WalletProvider>
+          <Overview go={() => {}} openJob={() => {}} />
+        </WalletProvider>
+      </LiveDataProvider>,
+    )
+    const rows = document.querySelectorAll('.qmini .qrow')
+    // capped at 6 so the column cannot grow unbounded; the rest go to "N more"
+    expect(rows.length).toBe(Math.min(6, JOBS.length))
+    expect(rows[0].querySelector('.nm')?.textContent).toBe(JOBS[0].service)
+    expect(rows[0].textContent).toContain('SOL')
+    expect(rows[0].querySelector('.st')?.textContent).toBe(JOBS[0].status)
   })
 })

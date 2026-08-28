@@ -1,11 +1,9 @@
 import {
   AGENT,
-  DECISIONS,
   etaBasisNote,
-  measuredTurnaroundMins,
+  intervalLabel,
   runwayDays,
   sol,
-  turnaroundLabel,
   usdApprox,
   type View,
 } from '../data'
@@ -23,17 +21,13 @@ type Props = { go: (v: View) => void; openJob: (id: string | null) => void }
 
 export default function Overview({ go, openJob }: Props) {
   // every figure below is derived from the day ledger / JOBS — nothing hand-typed
-  const { services, queue, isLive, emptyQueue, deliveredToday, queueTotal, queueTruncated, queueLimit, status } =
+  const { services, queue, isLive, emptyQueue, deliveredToday, queueTotal, status } =
     useResolved()
-  // backlog comes from the server, never from counting rows — /api/queue is
-  // paged, so a row count is "in this page" masquerading as "in total"
-  const open = status ? status.backlog : queue.filter((j) => j.status !== 'delivered').length
-  const turnaround = isLive ? null : measuredTurnaroundMins()
   // live figure when there is one; the sample ledger otherwise. Never a literal.
   const runway = isLive ? status?.runwayDays ?? null : runwayDays()
-  const reviewMins = status ? Math.round(status.tickIntervalSeconds / 60) : AGENT.reviewMinutes
-  // undefined = this server does not report one; [] = nothing outstanding
-  const agenda = status?.agenda
+  // "every 1 minutes" is what the naive version produced once the worker
+  // dropped to a 60s tick
+  const reviewEvery = status ? intervalLabel(status.tickIntervalSeconds) : `${AGENT.reviewMinutes} minutes`
 
   const nav = (v: View) => (e: React.MouseEvent) => {
     e.preventDefault()
@@ -94,7 +88,7 @@ export default function Overview({ go, openJob }: Props) {
                 A hardcoded headline is fine until the data behind it moves, and
                 then it is just a confident wrong number. */}
             <p>
-              It reviews its queue every {reviewMins} minutes and decides what is worth doing.
+              It reviews its queue every {reviewEvery} and decides what is worth doing.
               {runway == null ? (
                 <> Its runway is not yet measurable.</>
               ) : (
@@ -143,43 +137,64 @@ export default function Overview({ go, openJob }: Props) {
 
           <Status go={go} openJob={openJob} />
 
-          {/* Was a block of invented EARN/SPEND/PASS prose — "Cleared six jobs",
-              "+$54.00 net" — rendered in LIVE mode too, indistinguishable from
-              real activity. The live agenda is derived from the same response
-              that produces every other number on this page, so it cannot say
-              anything the state does not support. */}
-          {isLive ? (
-            agenda == null ? null : agenda.length === 0 ? (
-              // an empty agenda is the success state, not a rendering failure
-              <p className="agendaclear">
-                Nothing outstanding. Chipperton is taking orders and working its queue.
-              </p>
-            ) : (
-              agenda.map((a, i) => (
-                <div className="dec" key={i}>
-                  <div className="t">
-                    {/* blocked and waiting are different severities — collapsing
-                        them would make "not accepting orders" read like a note */}
-                    <span className={`tg ag-${a.kind}`}>{a.kind}</span>
-                    <span className="amt">{a.title}</span>
-                  </div>
-                  <div className="w">{a.detail}</div>
-                  <div className="clears">clears when {a.clearsWhen}</div>
-                </div>
-              ))
-            )
+          {/* The agenda ITEM LIST used to sit here. Removing it left ~850px of
+              white under the tiles, because this column is short and the one
+              beside it is not — so the queue moves up into that space rather
+              than the gap being left open.
+
+              Rendered as a compact list, not the wide table used on the jobs
+              page: five columns in a ~330px column would either crush or
+              force a horizontal scrollbar onto the front page. */}
+          <div className="qhead">
+            <span>queue</span>
+            <a className="qall" href="#" onClick={nav('jobs')}>
+              all jobs →
+            </a>
+          </div>
+          {emptyQueue ? (
+            <p className="emptyq">
+              No orders yet. The queue is genuinely empty — this is live data, not a placeholder.
+            </p>
           ) : (
-            DECISIONS.map((d, i) => (
-              <div className="dec" key={i}>
-                <div className="t">
-                  <span className={`tg ${d.kind}`}>
-                    {d.kind === 'earn' ? 'Earn' : d.kind === 'spend' ? 'Spend' : 'Pass'}
-                  </span>
-                  <span className="amt">{d.amount}</span>
+            <div className="qmini">
+              {queue.slice(0, 6).map((j) => (
+                <div
+                  className="qrow"
+                  key={j.id}
+                  onClick={() => {
+                    openJob(j.id)
+                    go('jobs')
+                  }}
+                >
+                  <div className="l1">
+                    <span className="nm">{j.service}</span>
+                    <span
+                      className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : j.terminal ? ' ref' : ''}`}
+                    >
+                      {j.status}
+                    </span>
+                  </div>
+                  <div className="l2">
+                    <span className="id">{j.id}</span>
+                    <span>{sol(j.amountSol)}</span>
+                    <span className="eta" title={j.etaMinutes != null ? etaBasisNote(j.etaBasis) : undefined}>
+                      {j.status === 'delivered'
+                        ? j.deliveredAt
+                        : !j.awaitingDelivery
+                          ? 'repaid'
+                          : j.etaMinutes != null
+                            ? `${j.etaMinutes} min`
+                            : '—'}
+                    </span>
+                  </div>
                 </div>
-                <div className="w">{d.why}</div>
-              </div>
-            ))
+              ))}
+              {queueTotal > 6 && (
+                <a className="qmore" href="#" onClick={nav('jobs')}>
+                  {queueTotal - 6} more →
+                </a>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -218,71 +233,6 @@ export default function Overview({ go, openJob }: Props) {
         </div>
       </section>
 
-      <section>
-        <div className="shead">
-          <h2>
-            <i className="dot" />
-            queue<span className="n">{open}</span>
-          </h2>
-          <span className="meta">
-            {deliveredToday} delivered today
-            {turnaround ? ` · ${turnaroundLabel(turnaround)} median turnaround, measured` : ''}
-            {queueTruncated ? ` · showing ${queueLimit} of ${queueTotal}` : ''}
-          </span>
-        </div>
-        {emptyQueue ? (
-          <p className="emptyq">
-            No orders yet. The queue is genuinely empty — this is live data, not a placeholder.
-          </p>
-        ) : (
-        <table className="qt">
-          <thead>
-            <tr>
-              <th>Job</th>
-              <th>Service</th>
-              <th>Paid in</th>
-              <th>Status</th>
-              <th>ETA</th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.map((j) => (
-              <tr key={j.id} onClick={() => { openJob(j.id); go('jobs') }}>
-                <td className="id">{j.id}</td>
-                <td className="nm">{j.service}</td>
-                <td className="pay">
-                  {/* the amount already says SOL, so the payer label is only
-                      worth showing when it is something else */}
-                  {j.chips && (
-                    <>
-                      <b>{j.payer}</b>{' · '}
-                    </>
-                  )}
-                  {sol(j.amountSol)}
-                  {usdApprox(j.amountUsd) && (
-                    <span className="mut"> · {usdApprox(j.amountUsd)}</span>
-                  )}
-                </td>
-                <td
-                  className={`st${j.status === 'running' ? ' run' : j.status === 'delivered' ? ' done' : j.terminal ? ' ref' : ''}`}
-                >
-                  {j.status}
-                </td>
-                <td className="eta" title={j.etaMinutes != null ? etaBasisNote(j.etaBasis) : undefined}>
-                  {j.status === 'delivered'
-                    ? j.deliveredAt
-                    : !j.awaitingDelivery
-                      ? 'repaid'
-                      : j.etaMinutes != null
-                        ? `${j.etaMinutes} min`
-                        : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        )}
-      </section>
     </div>
   )
 }

@@ -492,3 +492,28 @@
   .wal.hot:hover{border-bottom-color:var(--pale-red)}
   .wal.vault{color:var(--amber)}
   .wal.vault:hover{border-bottom-color:var(--amber)}
+  /* queue, pulled up beside the tiles where the agenda list used to be.
+     A compact list rather than the jobs-page table: five columns in a ~330px
+     column would crush, or force a horizontal scrollbar onto the front page. */
+  .qhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    margin:16px 0 2px;padding-top:12px;border-top:1px solid var(--line);
+    font-size:11px;font-weight:600;color:var(--text)}
+  .qall{font-size:10px;font-weight:400;color:var(--blue);text-decoration:none;white-space:nowrap}
+  .qall:hover{text-decoration:underline}
+  .qmini .qrow{padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .qmini .qrow:last-of-type{border-bottom:none}
+  .qmini .qrow:hover .nm{color:var(--green)}
+  .qmini .l1{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .qmini .l1 .nm{font-size:11.5px;font-weight:500;color:var(--text);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .qmini .l1 .st{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--faint);flex:none}
+  .qmini .l1 .st.run{color:var(--green)}
+  .qmini .l1 .st.done{color:var(--muted)}
+  .qmini .l1 .st.ref{color:var(--pale-red)}
+  .qmini .l2{display:flex;align-items:baseline;gap:9px;margin-top:2px;
+    font-family:var(--mono);font-size:10px;color:var(--muted)}
+  .qmini .l2 .id{color:var(--faint)}
+  .qmini .l2 .eta{margin-left:auto;color:var(--faint)}
+  .qmore{display:inline-block;margin-top:8px;font-size:10.5px;color:var(--blue);text-decoration:none}
+  .qmore:hover{text-decoration:underline}

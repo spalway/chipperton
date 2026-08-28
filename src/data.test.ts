@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chipsPriceSol, sol, usdApprox } from './data'
+import { chipsPriceSol, intervalLabel, sol, usdApprox } from './data'
 import {
   COST_LINES,
   DAILY_COST_USD,
@@ -190,5 +190,28 @@ describe('counts match the underlying rows', () => {
 
   it('delivered count matches delivered rows', () => {
     expect(deliveredToday()).toBe(JOBS.filter((j) => j.status === 'delivered').length)
+  })
+})
+
+describe('intervalLabel — the tick that dropped from 900s to 60s', () => {
+  it('says "minute", not "1 min", at a 60-second tick', () => {
+    // Math.round(60/60) rendered "every 1 min", and the prose read
+    // "every 1 minutes". The worker actually ticks every 60 seconds.
+    expect(intervalLabel(60)).toBe('minute')
+  })
+
+  it('keeps sub-minute intervals in seconds instead of rounding them up', () => {
+    // 45s rounding to "1 min" overstates the gap by a third
+    expect(intervalLabel(45)).toBe('45 sec')
+    expect(intervalLabel(30)).toBe('30 sec')
+  })
+
+  it('still reads correctly at the old 15-minute tick', () => {
+    expect(intervalLabel(900)).toBe('15 min')
+  })
+
+  it('does not print a fake number for a nonsense interval', () => {
+    expect(intervalLabel(0)).toBe('tick')
+    expect(intervalLabel(Number.NaN)).toBe('tick')
   })
 })

@@ -1,6 +1,7 @@
 import {
   AGENT,
   COST_BASIS,
+  intervalLabel,
   TREASURY,
   openJobs,
   pendingEtaMins,
@@ -98,7 +99,7 @@ export default function Status({ go, openJob }: Props) {
           <div className="v">{tick.label}</div>
           <div className="s">
             scheduled{nextIn != null ? ` · in ~${Math.max(nextIn, 0)} min` : ''} · every{' '}
-            {Math.round(s.tickIntervalSeconds / 60)} min
+            {intervalLabel(s.tickIntervalSeconds)}
           </div>
           {link('decisions', 'decisions →', 'red')}
         </div>
