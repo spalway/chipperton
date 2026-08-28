@@ -131,3 +131,65 @@ describe('$CHIPS contract address', () => {
     expect(await screen.findByText(/15% off/)).toBeInTheDocument()
   })
 })
+
+describe('agenda — derived, and empty means done', () => {
+  const mountOverview = async (agenda?: unknown) => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_URL', 'https://api.example')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const body = url.includes('/api/status')
+          ? { ...BASE, ...(agenda === undefined ? {} : { agenda }) }
+          : []
+        const headers = new Headers({ 'X-Queue-Total': '0', 'X-Queue-Limit': '25' })
+        return { ok: true, headers, json: async () => body } as Response
+      }),
+    )
+    const [{ default: Overview }, { default: WalletProvider }, { default: LiveDataProvider }] =
+      await Promise.all([
+        import('../pages/Overview'),
+        import('../WalletProvider'),
+        import('../LiveDataProvider'),
+      ])
+    render(
+      <LiveDataProvider>
+        <WalletProvider>
+          <Overview go={() => {}} openJob={() => {}} />
+        </WalletProvider>
+      </LiveDataProvider>,
+    )
+  }
+
+  it('never shows the invented EARN/SPEND/PASS prose when live', async () => {
+    // "Cleared six jobs" and "+$54.00 net" were constants rendered in live mode,
+    // indistinguishable from real activity to a reader.
+    await mountOverview([])
+    await waitFor(() => expect(screen.getByText(/Nothing outstanding/)).toBeInTheDocument())
+    expect(document.body.textContent).not.toContain('Cleared six jobs')
+    expect(document.body.textContent).not.toContain('+$54.00')
+  })
+
+  it('treats an empty agenda as success, not as missing data', async () => {
+    await mountOverview([])
+    expect(await screen.findByText(/Nothing outstanding/)).toBeInTheDocument()
+  })
+
+  it('renders nothing rather than "nothing outstanding" when the server sent no agenda', async () => {
+    // absent is unknown; empty is a claim. They must not render the same.
+    await mountOverview(undefined)
+    await waitFor(() => expect(screen.queryByText(/Cleared six jobs/)).toBeNull())
+    expect(screen.queryByText(/Nothing outstanding/)).toBeNull()
+  })
+
+  it('keeps blocked and waiting visually distinct', async () => {
+    await mountOverview([
+      { kind: 'blocked', title: 'Not accepting orders', detail: 'd1', clearsWhen: 'funded' },
+      { kind: 'waiting', title: '$CHIPS not launched', detail: 'd2', clearsWhen: 'mint set' },
+    ])
+    await waitFor(() => expect(screen.getByText('Not accepting orders')).toBeInTheDocument())
+    expect(document.querySelector('.tg.ag-blocked')).not.toBeNull()
+    expect(document.querySelector('.tg.ag-waiting')).not.toBeNull()
+    expect(screen.getByText(/clears when funded/)).toBeInTheDocument()
+  })
+})

@@ -79,8 +79,36 @@ export type StatusResponse = {
   /** Without the @, so the glyph is ours to render. Null if unset. */
   twitterHandle: string | null
   twitterUrl: string | null
+  /**
+   * What is standing between the agent and running normally, derived from the
+   * rest of this response. Optional because a server predating it sends
+   * nothing — and an absent agenda is unknown, which is NOT the same as an
+   * empty one, which means nothing is outstanding.
+   */
+  agenda?: AgendaItem[]
   vaultUrl: string | null
   hotWalletUrl: string | null
+}
+
+/**
+ * One thing standing between the agent and running normally.
+ *
+ * Derived server-side from state already in the same response — refund
+ * solvency, whether the token has a mint, the backlog — so nothing here is
+ * written ahead of time and the list empties itself as conditions clear.
+ *
+ * This replaced a block of invented EARN/SPEND/PASS prose that read exactly
+ * like real activity. An empty array is therefore SUCCESS, not missing data:
+ * it means nothing is outstanding.
+ */
+export type AgendaItem = {
+  /** 'blocked' stops work; 'waiting' does not. Do not collapse them. */
+  kind: 'blocked' | 'waiting' | 'working'
+  title: string
+  /** A sentence naming the actual numbers behind the item. */
+  detail: string
+  /** The condition that removes this item, in the agent's own words. */
+  clearsWhen: string
 }
 
 export type ServiceResponse = {

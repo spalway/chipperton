@@ -33,6 +33,8 @@ export default function Overview({ go, openJob }: Props) {
   // live figure when there is one; the sample ledger otherwise. Never a literal.
   const runway = isLive ? status?.runwayDays ?? null : runwayDays()
   const reviewMins = status ? Math.round(status.tickIntervalSeconds / 60) : AGENT.reviewMinutes
+  // undefined = this server does not report one; [] = nothing outstanding
+  const agenda = status?.agenda
 
   const nav = (v: View) => (e: React.MouseEvent) => {
     e.preventDefault()
@@ -132,17 +134,44 @@ export default function Overview({ go, openJob }: Props) {
 
           <Status go={go} openJob={openJob} />
 
-          {DECISIONS.map((d, i) => (
-            <div className="dec" key={i}>
-              <div className="t">
-                <span className={`tg ${d.kind}`}>
-                  {d.kind === 'earn' ? 'Earn' : d.kind === 'spend' ? 'Spend' : 'Pass'}
-                </span>
-                <span className="amt">{d.amount}</span>
+          {/* Was a block of invented EARN/SPEND/PASS prose — "Cleared six jobs",
+              "+$54.00 net" — rendered in LIVE mode too, indistinguishable from
+              real activity. The live agenda is derived from the same response
+              that produces every other number on this page, so it cannot say
+              anything the state does not support. */}
+          {isLive ? (
+            agenda == null ? null : agenda.length === 0 ? (
+              // an empty agenda is the success state, not a rendering failure
+              <p className="agendaclear">
+                Nothing outstanding. Chipperton is taking orders and working its queue.
+              </p>
+            ) : (
+              agenda.map((a, i) => (
+                <div className="dec" key={i}>
+                  <div className="t">
+                    {/* blocked and waiting are different severities — collapsing
+                        them would make "not accepting orders" read like a note */}
+                    <span className={`tg ag-${a.kind}`}>{a.kind}</span>
+                    <span className="amt">{a.title}</span>
+                  </div>
+                  <div className="w">{a.detail}</div>
+                  <div className="clears">clears when {a.clearsWhen}</div>
+                </div>
+              ))
+            )
+          ) : (
+            DECISIONS.map((d, i) => (
+              <div className="dec" key={i}>
+                <div className="t">
+                  <span className={`tg ${d.kind}`}>
+                    {d.kind === 'earn' ? 'Earn' : d.kind === 'spend' ? 'Spend' : 'Pass'}
+                  </span>
+                  <span className="amt">{d.amount}</span>
+                </div>
+                <div className="w">{d.why}</div>
               </div>
-              <div className="w">{d.why}</div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
